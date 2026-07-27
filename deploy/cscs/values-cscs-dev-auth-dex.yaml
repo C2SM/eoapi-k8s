@@ -1,0 +1,6 @@
+# Optional whole-site Dex/OIDC authentication for the CSCS dev deployment.
+# Apply after values-cscs-dev.yaml so this middleware chain replaces the base one.
+
+ingress:
+  annotations:
+    traefik.ingress.kubernetes.io/router.middlewares: "eoapi-dev-eoapi-dev-ipallowlist@kubernetescrd,eoapi-dev-eoapi-dev-oauth-errors@kubernetescrd,eoapi-dev-eoapi-dev-oauth-forwardauth@kubernetescrd,eoapi-dev-eoapi-strip-prefix-middleware@kubernetescrd"

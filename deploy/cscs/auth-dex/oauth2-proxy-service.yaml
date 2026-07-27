@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: eoapi-dev-oauth2-proxy
+  namespace: eoapi-dev
+  labels:
+    app.kubernetes.io/name: oauth2-proxy
+    app.kubernetes.io/part-of: eoapi-dev-auth-dex
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: oauth2-proxy
+    app.kubernetes.io/part-of: eoapi-dev-auth-dex
+  ports:
+    - name: http
+      port: 4180
+      targetPort: http

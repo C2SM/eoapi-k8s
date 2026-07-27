@@ -13,6 +13,10 @@ spec:
       app: {{ .Release.Name }}-browser
   template:
     metadata:
+      {{- if .Values.browser.customConfig }}
+      annotations:
+        checksum/browser-config: {{ include (print $.Template.BasePath "/services/browser/configmap.yaml") . | sha256sum }}
+      {{- end }}
       labels:
         app: {{ .Release.Name }}-browser
         {{- with .Values.browser.settings.labels }}
@@ -61,4 +65,22 @@ spec:
             {{- end }}
           resources:
           {{- toYaml .Values.browser.settings.resources | nindent 12 }}
+          {{- if .Values.browser.customConfig }}
+          volumeMounts:
+            - name: browser-custom-config
+              mountPath: /etc/eoapi/browser/browser_config.js
+              subPath: browser_config.js
+              readOnly: true
+            - name: browser-custom-config
+              mountPath: /docker-entrypoint.d/50-browser-custom-config.sh
+              subPath: 50-browser-custom-config.sh
+              readOnly: true
+          {{- end }}
+      {{- if .Values.browser.customConfig }}
+      volumes:
+        - name: browser-custom-config
+          configMap:
+            name: {{ .Release.Name }}-browser-config
+            defaultMode: 0555
+      {{- end }}
 {{- end }}

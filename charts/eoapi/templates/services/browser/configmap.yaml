@@ -1,0 +1,13 @@
+{{- if and .Values.browser.enabled .Values.browser.customConfig }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-browser-config
+data:
+  browser_config.js: |-
+{{- .Values.browser.customConfig | nindent 4 }}
+  50-browser-custom-config.sh: |-
+    #!/bin/sh
+    set -eu
+    cp /etc/eoapi/browser/browser_config.js /usr/share/nginx/html/config.js
+{{- end }}

@@ -198,6 +198,31 @@ tests:
             traefik.ingress.kubernetes.io/router.entrypoints: web
             traefik.ingress.kubernetes.io/router.middlewares: NAMESPACE-RELEASE-NAME-strip-prefix-middleware@kubernetescrd
 
+  - it: "traefik custom router annotations override generated defaults"
+    template: templates/networking/ingress.yaml
+    set:
+      ingress.className: "traefik"
+      ingress.entrypoints: "web"
+      ingress.host: "eoapi.local"
+      ingress.annotations:
+        traefik.ingress.kubernetes.io/router.entrypoints: "websecure"
+        traefik.ingress.kubernetes.io/router.tls: "true"
+        traefik.ingress.kubernetes.io/router.middlewares: "NAMESPACE-RELEASE-NAME-strip-prefix-middleware@kubernetescrd,NAMESPACE-extra-ipallowlist@kubernetescrd"
+      raster.enabled: true
+      stac.enabled: false
+      vector.enabled: false
+      multidim.enabled: false
+      browser.enabled: false
+    asserts:
+      - isKind:
+          of: Ingress
+      - equal:
+          path: metadata.annotations
+          value:
+            traefik.ingress.kubernetes.io/router.entrypoints: "websecure"
+            traefik.ingress.kubernetes.io/router.tls: "true"
+            traefik.ingress.kubernetes.io/router.middlewares: "NAMESPACE-RELEASE-NAME-strip-prefix-middleware@kubernetescrd,NAMESPACE-extra-ipallowlist@kubernetescrd"
+
   - it: "all services enabled with custom paths"
     template: templates/networking/ingress.yaml
     set:
@@ -446,7 +471,7 @@ tests:
             cert-manager.io/cluster-issuer: "letsencrypt-prod"
             traefik.ingress.kubernetes.io/router.middlewares: NAMESPACE-RELEASE-NAME-strip-prefix-middleware@kubernetescrd
 
-  - it: "traefik chart middlewares win over user router.middlewares annotation"
+  - it: "traefik user router.middlewares annotation overrides generated chain"
     template: templates/networking/ingress.yaml
     set:
       ingress.className: "traefik"
@@ -461,7 +486,7 @@ tests:
     asserts:
       - equal:
           path: metadata.annotations["traefik.ingress.kubernetes.io/router.middlewares"]
-          value: NAMESPACE-RELEASE-NAME-strip-prefix-middleware@kubernetescrd
+          value: custom-auth@kubernetescrd
 
   - it: "nginx chart rewrite annotations win over user rewrite-target/use-regex"
     template: templates/networking/ingress.yaml

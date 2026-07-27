@@ -49,7 +49,8 @@ ingress:
   host: ""
   # Multiple host domains array - if specified, takes precedence over single host
   # hosts: []
-  # Custom annotations (chart owns rewrite-target/use-regex/router.middlewares)
+  # Custom annotations (nginx rewrite-target/use-regex are chart-owned; Traefik
+  # router annotations can override generated defaults)
   annotations: {}
   # TLS configuration
   tls:
@@ -635,6 +636,9 @@ browser:
   # If not set, will be constructed from ingress.host and stac.ingress.path
   # Useful when using custom ingress solutions with ingress.enabled=false
   catalogUrl: ""
+  # Optional: Custom STAC Browser config.js content. Use this for settings that
+  # cannot be provided through SB_* environment variables, such as JS callbacks.
+  customConfig: ""
   # Custom catalog title
   catalogTitle: ""
   # Custom catalog image/logo URL

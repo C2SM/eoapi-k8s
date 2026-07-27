@@ -1,0 +1,49 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: eoapi-dev-dex-config
+  namespace: eoapi-dev
+  labels:
+    app.kubernetes.io/name: dex
+    app.kubernetes.io/part-of: eoapi-dev-auth-dex
+data:
+  config.yaml: |
+    issuer: https://dex-eoapi-dev.c2sm-tds.c2sm.cscs.ch
+
+    storage:
+      type: memory
+
+    web:
+      http: 0.0.0.0:5556
+
+    oauth2:
+      skipApprovalScreen: true
+      passwordConnector: local
+
+    staticClients:
+      - id: eoapi-dev
+        name: eoAPI CSCS dev
+        secretEnv: DEX_EOAPI_CLIENT_SECRET
+        redirectURIs:
+          - https://eoapi-dev.c2sm-tds.c2sm.cscs.ch/oauth2/callback
+
+    enablePasswordDB: true
+    staticPasswords:
+      - email: kservis@example.org
+        hashFromEnv: DEX_KSERVIS_USER_HASH
+        username: kservis
+        preferredUsername: kservis
+        name: kservis
+        userID: kservis
+        groups:
+          - /eoapi-dev-users
+          - /eoapi-admin
+      - email: noaa-reader@example.org
+        hashFromEnv: DEX_NOAA_READER_USER_HASH
+        username: noaa-reader
+        preferredUsername: noaa-reader
+        name: eoAPI NOAA Reader
+        userID: noaa-reader
+        groups:
+          - /eoapi-dev-users
+          - /eoapi-noaa

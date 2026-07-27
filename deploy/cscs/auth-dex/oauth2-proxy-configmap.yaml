@@ -1,0 +1,33 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: eoapi-dev-oauth2-proxy-config
+  namespace: eoapi-dev
+  labels:
+    app.kubernetes.io/name: oauth2-proxy
+    app.kubernetes.io/part-of: eoapi-dev-auth-dex
+data:
+  oauth2-proxy.cfg: |
+    http_address = "0.0.0.0:4180"
+    provider = "oidc"
+    provider_display_name = "Dex"
+    oidc_issuer_url = "https://dex-eoapi-dev.c2sm-tds.c2sm.cscs.ch"
+    oidc_groups_claim = "groups"
+    redirect_url = "https://eoapi-dev.c2sm-tds.c2sm.cscs.ch/oauth2/callback"
+    proxy_prefix = "/oauth2"
+    skip_provider_button = true
+
+    email_domains = ["*"]
+    allowed_groups = ["/eoapi-dev-users"]
+    scope = "openid email profile groups"
+
+    upstreams = ["static://202"]
+    reverse_proxy = true
+    set_xauthrequest = true
+    pass_user_headers = true
+    skip_jwt_bearer_tokens = true
+    bearer_token_login_fallback = false
+
+    cookie_name = "__Secure-eoapi-dev-oauth2"
+    cookie_secure = true
+    cookie_samesite = "lax"

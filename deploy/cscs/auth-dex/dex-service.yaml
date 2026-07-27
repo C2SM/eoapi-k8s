@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: eoapi-dev-dex
+  namespace: eoapi-dev
+  labels:
+    app.kubernetes.io/name: dex
+    app.kubernetes.io/part-of: eoapi-dev-auth-dex
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: dex
+    app.kubernetes.io/part-of: eoapi-dev-auth-dex
+  ports:
+    - name: http
+      port: 5556
+      targetPort: http

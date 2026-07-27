@@ -1,0 +1,29 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: eoapi-dev-dex
+  namespace: eoapi-dev
+  labels:
+    app.kubernetes.io/name: dex
+    app.kubernetes.io/part-of: eoapi-dev-auth-dex
+  annotations:
+    cert-manager.io/cluster-issuer: "letsencrypt-http01-traefik"
+    traefik.ingress.kubernetes.io/router.entrypoints: "websecure"
+    traefik.ingress.kubernetes.io/router.tls: "true"
+spec:
+  ingressClassName: traefik
+  rules:
+    - host: dex-eoapi-dev.c2sm-tds.c2sm.cscs.ch
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: eoapi-dev-dex
+                port:
+                  number: 5556
+  tls:
+    - hosts:
+        - dex-eoapi-dev.c2sm-tds.c2sm.cscs.ch
+      secretName: dex-eoapi-dev-tls

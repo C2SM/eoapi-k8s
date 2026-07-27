@@ -1,0 +1,29 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: eoapi-dev-oauth2-proxy
+  namespace: eoapi-dev
+  labels:
+    app.kubernetes.io/name: oauth2-proxy
+    app.kubernetes.io/part-of: eoapi-dev-auth-dex
+  annotations:
+    traefik.ingress.kubernetes.io/router.entrypoints: "websecure"
+    traefik.ingress.kubernetes.io/router.tls: "true"
+    traefik.ingress.kubernetes.io/router.middlewares: "eoapi-dev-eoapi-dev-ipallowlist@kubernetescrd"
+spec:
+  ingressClassName: traefik
+  rules:
+    - host: eoapi-dev.c2sm-tds.c2sm.cscs.ch
+      http:
+        paths:
+          - path: /oauth2
+            pathType: Prefix
+            backend:
+              service:
+                name: eoapi-dev-oauth2-proxy
+                port:
+                  number: 4180
+  tls:
+    - hosts:
+        - eoapi-dev.c2sm-tds.c2sm.cscs.ch
+      secretName: eoapi-dev-tls

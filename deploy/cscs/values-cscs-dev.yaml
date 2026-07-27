@@ -1,0 +1,117 @@
+# CSCS dev deployment for the c2sm-tds Kubernetes cluster.
+# Change the anchored storage class/size below to resize both Postgres data and pgBackRest repo PVCs.
+
+ingress:
+  enabled: true
+  className: "traefik"
+  host: "eoapi-dev.c2sm-tds.c2sm.cscs.ch"
+  annotations:
+    cert-manager.io/cluster-issuer: "letsencrypt-http01-traefik"
+    traefik.ingress.kubernetes.io/router.entrypoints: "websecure"
+    traefik.ingress.kubernetes.io/router.tls: "true"
+    traefik.ingress.kubernetes.io/router.middlewares: "eoapi-dev-eoapi-strip-prefix-middleware@kubernetescrd,eoapi-dev-eoapi-dev-ipallowlist@kubernetescrd"
+  tls:
+    enabled: true
+    secretName: "eoapi-dev-tls"
+
+apiServices:
+  - stac
+  - raster
+  - vector
+
+stac:
+  enabled: true
+  ingress:
+    enabled: true
+    path: "/stac"
+
+raster:
+  enabled: true
+  ingress:
+    enabled: true
+    path: "/raster"
+
+vector:
+  enabled: true
+  ingress:
+    enabled: true
+    path: "/vector"
+
+browser:
+  enabled: true
+  ingress:
+    enabled: true
+    path: "/browser"
+  catalogUrl: "https://eoapi-dev.c2sm-tds.c2sm.cscs.ch/stac"
+  customConfig: |
+    window.STAC_BROWSER_CONFIG = {
+      catalogUrl: "https://eoapi-dev.c2sm-tds.c2sm.cscs.ch/stac",
+      pathPrefix: "/browser/",
+      useTileLayerAsFallback: false,
+      buildTileUrlTemplate: function(asset) {
+        var item = asset && typeof asset.getContext === "function" ? asset.getContext() : null;
+        var assetKey = asset && typeof asset.getKey === "function" ? asset.getKey() : null;
+        var collection = item && item.collection;
+        var itemId = item && item.id;
+
+        if (!collection || !itemId || !assetKey) {
+          return null;
+        }
+
+        return "https://eoapi-dev.c2sm-tds.c2sm.cscs.ch/raster/collections/" + encodeURIComponent(collection) +
+          "/items/" + encodeURIComponent(itemId) +
+          "/tiles/WebMercatorQuad/{z}/{x}/{y}.png?assets=" + encodeURIComponent(assetKey);
+      }
+    };
+
+multidim:
+  enabled: false
+
+testing:
+  mockOidcServer:
+    enabled: false
+
+stac-auth-proxy:
+  enabled: false
+
+eoapi-notifier:
+  enabled: false
+
+knative:
+  enabled: false
+
+monitoring:
+  metricsServer:
+    enabled: false
+  prometheus:
+    enabled: false
+  prometheusAdapter:
+    enabled: false
+
+observability:
+  grafana:
+    enabled: false
+
+postgresql:
+  type: "postgrescluster"
+
+postgrescluster:
+  enabled: true
+  postgresVersion: 16
+  postGISVersion: "3.4"
+  pgBouncerReplicas: 1
+  monitoring: false
+  instances:
+    - name: "eoapi"
+      replicas: 1
+      dataVolumeClaimSpec:
+        storageClassName: &cscsStorageClass "ceph-corbo-rbd-nvme-retain"
+        accessModes:
+          - "ReadWriteOnce"
+        resources:
+          requests:
+            storage: &cscsPostgresStorage "100Gi"
+      resources: {}
+  backupsEnabled: true
+  backupsSize: *cscsPostgresStorage
+  backupsStorageClassName: *cscsStorageClass

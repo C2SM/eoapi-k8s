@@ -564,6 +564,10 @@
             }
           }
         },
+        "customConfig": {
+          "type": "string",
+          "description": "Custom STAC Browser config.js content"
+        },
         "settings": {
           "type": "object",
           "properties": {
