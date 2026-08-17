@@ -1,0 +1,32 @@
+stac:
+    enabled: true
+    ingress:
+        enabled: true
+        path: "/stac"
+    overrideRootPath: ""
+
+stac-auth-proxy:
+    enabled: true
+    ingress:
+        enabled: false
+    env:
+        UPSTREAM_URL: "http://eoapi-stac:8080"
+        OIDC_DISCOVERY_URL: "https://dex-eoapi-dev.c2sm-tds.c2sm.cscs.ch/.well-known/openid-configuration"
+        OIDC_DISCOVERY_INTERNAL_URL: "https://dex-eoapi-dev.c2sm-tds.c2sm.cscs.ch/.well-known/openid-configuration"
+        ALLOWED_JWT_AUDIENCES: "eoapi-dev"
+        ROOT_PATH: "/stac"
+        ROOT_PATH_SKIP_PREFIXES: "/raster,/vector,/browser,/multidim"
+        OVERRIDE_HOST: "false"
+        DEFAULT_PUBLIC: "true"
+        COLLECTIONS_FILTER_CLS: "stac_auth_proxy.custom_filters:CollectionsFilter"
+        ITEMS_FILTER_CLS: "stac_auth_proxy.custom_filters:ItemsFilter"
+    customFiltersFile: "data/stac-auth-proxy/custom_filters.py"
+    extraVolumes:
+        - name: filters
+          configMap:
+              name: eoapi-stac-auth-proxy-custom-filters
+    extraVolumeMounts:
+        - name: filters
+          mountPath: /app/src/stac_auth_proxy/custom_filters.py
+          subPath: custom_filters.py
+          readOnly: true

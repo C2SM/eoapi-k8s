@@ -45,6 +45,16 @@ spec:
                 secretKeyRef:
                   name: dex-secret
                   key: noaa-reader-user-hash
+            - name: DEX_NASA_READER_USER_HASH
+              valueFrom:
+                secretKeyRef:
+                  name: dex-secret
+                  key: nasa-reader-user-hash
+            - name: DEX_DYAMOND_READER_USER_HASH
+              valueFrom:
+                secretKeyRef:
+                  name: dex-secret
+                  key: dyamond-reader-user-hash
           livenessProbe:
             tcpSocket:
               port: http

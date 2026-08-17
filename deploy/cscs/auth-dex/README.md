@@ -42,6 +42,8 @@ This stack pins Dex to `ghcr.io/dexidp/dex:v2.45.1`. Dex `v2.45.x` supports `gro
 /eoapi-dev-users
 /eoapi-admin
 /eoapi-noaa
+/nasa-users
+/dyamond-users
 ```
 
 oauth2-proxy requests `openid email profile groups` and allows `/eoapi-dev-users` globally. This is still whole-site authorization only. Dataset-level filtering is not implemented here.
@@ -49,8 +51,10 @@ oauth2-proxy requests `openid email profile groups` and allows `/eoapi-dev-users
 The current static users are:
 
 ```text
-kservis@example.org      kservis      /eoapi-dev-users,/eoapi-admin
-noaa-reader@example.org  noaa-reader  /eoapi-dev-users,/eoapi-noaa
+kservis@example.org         kservis         /eoapi-dev-users,/eoapi-admin
+noaa-reader@example.org     noaa-reader     /eoapi-dev-users,/eoapi-noaa
+nasa-reader@example.org     nasa-reader     /eoapi-dev-users,/nasa-users
+dyamond-reader@example.org  dyamond-reader  /eoapi-dev-users,/dyamond-users
 ```
 
 ## Secrets
@@ -70,6 +74,12 @@ KSERVIS_HASH=$(printf '%s\n' "$KSERVIS_PASSWORD" | htpasswd -BinC 10 kservis | c
 
 read -rsp 'Dex noaa-reader password: ' NOAA_READER_PASSWORD; echo
 NOAA_READER_HASH=$(printf '%s\n' "$NOAA_READER_PASSWORD" | htpasswd -BinC 10 noaa-reader | cut -d: -f2)
+
+read -rsp 'Dex nasa-reader password: ' NASA_READER_PASSWORD; echo
+NASA_READER_HASH=$(printf '%s\n' "$NASA_READER_PASSWORD" | htpasswd -BinC 10 nasa-reader | cut -d: -f2)
+
+read -rsp 'Dex dyamond-reader password: ' DYAMOND_READER_PASSWORD; echo
+DYAMOND_READER_HASH=$(printf '%s\n' "$DYAMOND_READER_PASSWORD" | htpasswd -BinC 10 dyamond-reader | cut -d: -f2)
 ```
 
 Create the Kubernetes secrets:
@@ -80,7 +90,9 @@ kubectl create namespace eoapi-dev --dry-run=client -o yaml | kubectl apply -f -
 kubectl -n eoapi-dev create secret generic dex-secret \
   --from-literal=client-secret="$DEX_CLIENT_SECRET" \
   --from-literal=kservis-user-hash="$KSERVIS_HASH" \
-  --from-literal=noaa-reader-user-hash="$NOAA_READER_HASH"
+  --from-literal=noaa-reader-user-hash="$NOAA_READER_HASH" \
+  --from-literal=nasa-reader-user-hash="$NASA_READER_HASH" \
+  --from-literal=dyamond-reader-user-hash="$DYAMOND_READER_HASH"
 
 kubectl -n eoapi-dev create secret generic oauth2-proxy-dex-secret \
   --from-literal=client-id='eoapi-dev' \

@@ -47,3 +47,21 @@ data:
         groups:
           - /eoapi-dev-users
           - /eoapi-noaa
+      - email: nasa-reader@example.org
+        hashFromEnv: DEX_NASA_READER_USER_HASH
+        username: nasa-reader
+        preferredUsername: nasa-reader
+        name: eoAPI NASA Reader
+        userID: nasa-reader
+        groups:
+          - /eoapi-dev-users
+          - /nasa-users
+      - email: dyamond-reader@example.org
+        hashFromEnv: DEX_DYAMOND_READER_USER_HASH
+        username: dyamond-reader
+        preferredUsername: dyamond-reader
+        name: eoAPI DYAMOND Reader
+        userID: dyamond-reader
+        groups:
+          - /eoapi-dev-users
+          - /dyamond-users

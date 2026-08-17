@@ -47,6 +47,17 @@ browser:
     window.STAC_BROWSER_CONFIG = {
       catalogUrl: "https://eoapi-dev.c2sm-tds.c2sm.cscs.ch/stac",
       pathPrefix: "/browser/",
+      catalogImage: "https://ethz.ch/content/dam/ethz/special-interest/usys/c2sm-dam/center/logos/logo_xlarge.gif",
+      footerLinks: [
+        {
+          label: "ETH Zürich",
+          url: "https://ethz.ch/"
+        },
+        {
+          label: "C2SM",
+          url: "https://c2sm.ethz.ch/"
+        }
+      ],
       useTileLayerAsFallback: false,
       buildTileUrlTemplate: function(asset) {
         var item = asset && typeof asset.getContext === "function" ? asset.getContext() : null;

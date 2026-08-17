@@ -27,6 +27,7 @@ data:
     pass_user_headers = true
     skip_jwt_bearer_tokens = true
     bearer_token_login_fallback = false
+    set_authorization_header = true
 
     cookie_name = "__Secure-eoapi-dev-oauth2"
     cookie_secure = true

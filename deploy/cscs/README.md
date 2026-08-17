@@ -49,10 +49,18 @@ KSERVIS_HASH=$(printf '%s\n' "$KSERVIS_PASSWORD" | htpasswd -BinC 10 kservis | c
 read -rsp 'Dex noaa-reader password: ' NOAA_READER_PASSWORD; echo
 NOAA_READER_HASH=$(printf '%s\n' "$NOAA_READER_PASSWORD" | htpasswd -BinC 10 noaa-reader | cut -d: -f2)
 
+read -rsp 'Dex nasa-reader password: ' NASA_READER_PASSWORD; echo
+NASA_READER_HASH=$(printf '%s\n' "$NASA_READER_PASSWORD" | htpasswd -BinC 10 nasa-reader | cut -d: -f2)
+
+read -rsp 'Dex dyamond-reader password: ' DYAMOND_READER_PASSWORD; echo
+DYAMOND_READER_HASH=$(printf '%s\n' "$DYAMOND_READER_PASSWORD" | htpasswd -BinC 10 dyamond-reader | cut -d: -f2)
+
 kubectl -n eoapi-dev create secret generic dex-secret \
   --from-literal=client-secret="$DEX_CLIENT_SECRET" \
   --from-literal=kservis-user-hash="$KSERVIS_HASH" \
-  --from-literal=noaa-reader-user-hash="$NOAA_READER_HASH"
+  --from-literal=noaa-reader-user-hash="$NOAA_READER_HASH" \
+  --from-literal=nasa-reader-user-hash="$NASA_READER_HASH" \
+  --from-literal=dyamond-reader-user-hash="$DYAMOND_READER_HASH"
 
 kubectl -n eoapi-dev create secret generic oauth2-proxy-dex-secret \
   --from-literal=client-id='eoapi-dev' \
