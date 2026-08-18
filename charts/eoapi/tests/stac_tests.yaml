@@ -39,6 +39,53 @@ tests:
           path: spec.template.metadata.annotations["checksum/config"]
           pattern: ^[a-f0-9]{64}$
 
+  - it: "stac deployment uses ingress path when root path override is absent"
+    set:
+      ingress.className: "traefik"
+      stac.enabled: true
+      raster.enabled: false
+      vector.enabled: false
+      multidim.enabled: false
+    template: templates/services/stac/deployment.yaml
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].command
+          content: "--root-path=/stac"
+
+  - it: "stac deployment omits root path for an empty override"
+    set:
+      ingress.className: "traefik"
+      stac.enabled: true
+      stac.overrideRootPath: ""
+      raster.enabled: false
+      vector.enabled: false
+      multidim.enabled: false
+    template: templates/services/stac/deployment.yaml
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].command
+          value:
+            - uvicorn
+            - stac_fastapi.pgstac.app:app
+            - --host=$(HOST)
+            - --port=$(PORT)
+            - --proxy-headers
+            - --forwarded-allow-ips=*
+
+  - it: "stac deployment uses a non-empty root path override"
+    set:
+      ingress.className: "traefik"
+      stac.enabled: true
+      stac.overrideRootPath: "/api"
+      raster.enabled: false
+      vector.enabled: false
+      multidim.enabled: false
+    template: templates/services/stac/deployment.yaml
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].command
+          content: "--root-path=/api"
+
   - it: "stac configmap defaults"
     set:
       raster.enabled: false

@@ -129,25 +129,18 @@ def _load_allowed_collection_ids(auth_values: tuple[str, ...]) -> list[str]:
     return collection_ids
 
 
-async def _allowed_collection_ids(context: dict[str, Any]) -> list[str] | None:
+async def _items_auth_groups_filter(context: dict[str, Any]) -> str | dict[str, Any]:
     groups = _groups(context)
 
     if ADMIN_GROUP in groups:
-        return None
+        return "1=1"
 
     auth_values = tuple(sorted(_authorized_auth_values(groups)))
 
     if not auth_values:
-        return []
+        return "1=0"
 
-    return await asyncio.to_thread(_load_allowed_collection_ids, auth_values)
-
-
-async def _items_auth_groups_filter(context: dict[str, Any]) -> str | dict[str, Any]:
-    collection_ids = await _allowed_collection_ids(context)
-
-    if collection_ids is None:
-        return "1=1"
+    collection_ids = await asyncio.to_thread(_load_allowed_collection_ids, auth_values)
 
     return _collection_ids_filter(collection_ids)
 

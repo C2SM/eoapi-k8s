@@ -14,6 +14,20 @@ Only extract truly common elements that are mechanical and don't need customizat
 {{- end -}}
 
 {{/*
+Return the STAC root path command argument.
+An explicitly empty override omits the argument so stac-auth-proxy owns the path prefix.
+*/}}
+{{- define "eoapi.stacRootPathArg" -}}
+{{- if hasKey .Values.stac "overrideRootPath" }}
+{{- if ne .Values.stac.overrideRootPath "" }}
+- "--root-path={{ .Values.stac.overrideRootPath }}"
+{{- end }}
+{{- else }}
+- "--root-path={{ .Values.stac.ingress.path }}"
+{{- end }}
+{{- end -}}
+
+{{/*
 Helper function for common environment variables
 */}}
 {{- define "eoapi.commonEnvVars" -}}
