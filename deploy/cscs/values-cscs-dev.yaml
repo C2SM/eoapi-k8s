@@ -121,7 +121,7 @@ postgrescluster:
           - "ReadWriteOnce"
         resources:
           requests:
-            storage: &cscsPostgresStorage "100Gi"
+            storage: &cscsPostgresStorage "300Gi"
       resources: {}
   backupsEnabled: true
   backupsSize: *cscsPostgresStorage
