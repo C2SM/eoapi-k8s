@@ -8,14 +8,9 @@
 {{- if .Values.ingress.entrypoints -}}
 {{- $_ := set $annotations "traefik.ingress.kubernetes.io/router.entrypoints" (.Values.ingress.entrypoints | toString) -}}
 {{- end -}}
-{{- /* strip-prefix always; also chain the browser bare-path redirect when the browser ingress is on.
-       Keep this condition in sync with the redirect Middleware in traefik-middleware.yaml. */}}
-{{- $mwPrefix := printf "%s-%s" .Release.Namespace .Release.Name }}
-{{- $middlewares := list (printf "%s-strip-prefix-middleware@kubernetescrd" $mwPrefix) }}
-{{- if include "eoapi.browserRedirectEnabled" . | trim }}
-{{- $middlewares = append $middlewares (printf "%s-browser-redirect-middleware@kubernetescrd" $mwPrefix) }}
+{{- if include "eoapi.traefikStripPrefixes" . | fromJsonArray }}
+{{- $_ := set $annotations "traefik.ingress.kubernetes.io/router.middlewares" (printf "%s-%s-strip-prefix-middleware@kubernetescrd" .Release.Namespace .Release.Name) -}}
 {{- end }}
-{{- $_ := set $annotations "traefik.ingress.kubernetes.io/router.middlewares" (join "," $middlewares) -}}
 {{- $annotations = mergeOverwrite $annotations (.Values.ingress.annotations | default dict) -}}
 {{- else }}
 {{- $annotations = mergeOverwrite $annotations (.Values.ingress.annotations | default dict) -}}
