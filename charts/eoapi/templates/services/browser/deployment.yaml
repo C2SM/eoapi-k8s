@@ -13,7 +13,7 @@ spec:
       app: {{ .Release.Name }}-browser
   template:
     metadata:
-      {{- if .Values.browser.customConfig }}
+      {{- if or .Values.browser.customConfig .Values.browser.favicon }}
       annotations:
         checksum/browser-config: {{ include (print $.Template.BasePath "/services/browser/configmap.yaml") . | sha256sum }}
       {{- end }}
@@ -69,18 +69,26 @@ spec:
             {{- end }}
           resources:
           {{- toYaml .Values.browser.settings.resources | nindent 12 }}
-          {{- if .Values.browser.customConfig }}
+          {{- if or .Values.browser.customConfig .Values.browser.favicon }}
           volumeMounts:
+            {{- if .Values.browser.customConfig }}
             - name: browser-custom-config
               mountPath: /etc/eoapi/browser/browser_config.js
               subPath: browser_config.js
               readOnly: true
+            {{- end }}
+            {{- if .Values.browser.favicon }}
+            - name: browser-custom-config
+              mountPath: /etc/eoapi/browser/favicon.png
+              subPath: favicon.png
+              readOnly: true
+            {{- end }}
             - name: browser-custom-config
               mountPath: /docker-entrypoint.d/50-browser-custom-config.sh
               subPath: 50-browser-custom-config.sh
               readOnly: true
           {{- end }}
-      {{- if .Values.browser.customConfig }}
+      {{- if or .Values.browser.customConfig .Values.browser.favicon }}
       volumes:
         - name: browser-custom-config
           configMap:

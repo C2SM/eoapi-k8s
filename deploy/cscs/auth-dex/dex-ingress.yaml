@@ -13,7 +13,7 @@ metadata:
 spec:
   ingressClassName: traefik
   rules:
-    - host: dex-eoapi-dev.c2sm-tds.c2sm.cscs.ch
+    - host: dex-prometheus-dev.c2sm-tds.c2sm.cscs.ch
       http:
         paths:
           - path: /
@@ -25,5 +25,5 @@ spec:
                   number: 5556
   tls:
     - hosts:
-        - dex-eoapi-dev.c2sm-tds.c2sm.cscs.ch
+        - dex-prometheus-dev.c2sm-tds.c2sm.cscs.ch
       secretName: dex-eoapi-dev-tls

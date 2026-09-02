@@ -4,7 +4,7 @@
 ingress:
   enabled: true
   className: "traefik"
-  host: "eoapi-dev.c2sm-tds.c2sm.cscs.ch"
+  host: "prometheus-dev.c2sm-tds.c2sm.cscs.ch"
   annotations:
     cert-manager.io/cluster-issuer: "letsencrypt-http01-traefik"
     traefik.ingress.kubernetes.io/router.entrypoints: "websecure"
@@ -42,10 +42,13 @@ browser:
   ingress:
     enabled: true
     path: "/browser"
-  catalogUrl: "https://eoapi-dev.c2sm-tds.c2sm.cscs.ch/stac"
+  catalogUrl: "https://prometheus-dev.c2sm-tds.c2sm.cscs.ch/stac"
+  catalogTitle: "Prometheus"
+  # C2SM logo mark, cropped/padded from https://ethz.ch/content/dam/ethz/special-interest/usys/c2sm-dam/center/logos/logo_xlarge.gif
+  favicon: "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"
   # Must be externally accessible; feeds the SB_authConfig openIdConnectUrl
   # the chart generates for stac-browser's oidc-client-ts-based OIDC login.
-  oidcDiscoveryUrl: "https://dex-eoapi-dev.c2sm-tds.c2sm.cscs.ch/.well-known/openid-configuration"
+  oidcDiscoveryUrl: "https://dex-prometheus-dev.c2sm-tds.c2sm.cscs.ch/.well-known/openid-configuration"
   # oauth2-proxy's whole-site gate requires a "groups" claim (allowed_groups
   # in oauth2-proxy-configmap.yaml) to authorize a request; "openid" alone
   # gets a token with no groups/email claims and a 401->redirect-to-login
@@ -74,7 +77,7 @@ browser:
         return null;
       }
 
-      return "https://eoapi-dev.c2sm-tds.c2sm.cscs.ch/raster/collections/" + encodeURIComponent(collection) +
+      return "https://prometheus-dev.c2sm-tds.c2sm.cscs.ch/raster/collections/" + encodeURIComponent(collection) +
         "/items/" + encodeURIComponent(itemId) +
         "/tiles/WebMercatorQuad/{z}/{x}/{y}.png?assets=" + encodeURIComponent(assetKey);
     };

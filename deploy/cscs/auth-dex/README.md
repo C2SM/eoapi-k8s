@@ -16,20 +16,20 @@ It is intended for development only. Browser login and bearer-token curl testing
 Dex is served at the root of:
 
 ```text
-https://dex-eoapi-dev.c2sm-tds.c2sm.cscs.ch
+https://dex-prometheus-dev.c2sm-tds.c2sm.cscs.ch
 ```
 
 The Dex issuer and discovery URL are:
 
 ```text
-Issuer: https://dex-eoapi-dev.c2sm-tds.c2sm.cscs.ch
-Discovery: https://dex-eoapi-dev.c2sm-tds.c2sm.cscs.ch/.well-known/openid-configuration
+Issuer: https://dex-prometheus-dev.c2sm-tds.c2sm.cscs.ch
+Discovery: https://dex-prometheus-dev.c2sm-tds.c2sm.cscs.ch/.well-known/openid-configuration
 ```
 
 eoAPI still uses this oauth2-proxy callback:
 
 ```text
-https://eoapi-dev.c2sm-tds.c2sm.cscs.ch/oauth2/callback
+https://prometheus-dev.c2sm-tds.c2sm.cscs.ch/oauth2/callback
 ```
 
 Dex discovery must be reachable from the oauth2-proxy pod at the public issuer URL. The Dex ingress is therefore not protected by the IP allowlist or ForwardAuth middleware. eoAPI and `/oauth2` remain protected by the existing IP allowlist, and eoAPI remains protected by oauth2-proxy ForwardAuth.
@@ -148,11 +148,11 @@ From an IP allowed by `deploy/cscs/traefik-ipallowlist.yaml`, check:
 
 ```bash
 kubectl -n eoapi-dev get pods,svc,ingress,middleware | grep -E 'dex|oauth'
-curl -i https://eoapi-dev.c2sm-tds.c2sm.cscs.ch/oauth2/auth
-curl -s https://dex-eoapi-dev.c2sm-tds.c2sm.cscs.ch/.well-known/openid-configuration | jq
+curl -i https://prometheus-dev.c2sm-tds.c2sm.cscs.ch/oauth2/auth
+curl -s https://dex-prometheus-dev.c2sm-tds.c2sm.cscs.ch/.well-known/openid-configuration | jq
 ```
 
-The unauthenticated `/oauth2/auth` response should be `401`. Browser access to `https://eoapi-dev.c2sm-tds.c2sm.cscs.ch/browser/` should redirect to Dex login. After login, `/browser/` should load.
+The unauthenticated `/oauth2/auth` response should be `401`. Browser access to `https://prometheus-dev.c2sm-tds.c2sm.cscs.ch/browser/` should redirect to Dex login. After login, `/browser/` should load.
 
 ## Backend Header Verification
 
@@ -189,7 +189,7 @@ metadata:
 spec:
   ingressClassName: traefik
   rules:
-    - host: eoapi-dev.c2sm-tds.c2sm.cscs.ch
+    - host: prometheus-dev.c2sm-tds.c2sm.cscs.ch
       http:
         paths:
           - path: /auth-header-echo
@@ -201,7 +201,7 @@ spec:
                   number: 80
   tls:
     - hosts:
-        - eoapi-dev.c2sm-tds.c2sm.cscs.ch
+        - prometheus-dev.c2sm-tds.c2sm.cscs.ch
       secretName: eoapi-dev-tls
 EOF
 ```
@@ -209,7 +209,7 @@ EOF
 After logging in as `kservis`, open:
 
 ```text
-https://eoapi-dev.c2sm-tds.c2sm.cscs.ch/auth-header-echo
+https://prometheus-dev.c2sm-tds.c2sm.cscs.ch/auth-header-echo
 ```
 
 Confirm the echo response includes values like:
@@ -241,12 +241,12 @@ TOKEN_RESPONSE=$(curl -s \
   --data-urlencode 'scope=openid email profile groups' \
   --data-urlencode 'username=kservis@example.org' \
   --data-urlencode "password=$KSERVIS_PASSWORD" \
-  https://dex-eoapi-dev.c2sm-tds.c2sm.cscs.ch/token)
+  https://dex-prometheus-dev.c2sm-tds.c2sm.cscs.ch/token)
 
 TOKEN=$(echo "$TOKEN_RESPONSE" | jq -r '.id_token')
 
 curl -H "Authorization: Bearer $TOKEN" \
-  https://eoapi-dev.c2sm-tds.c2sm.cscs.ch/stac/collections
+  https://prometheus-dev.c2sm-tds.c2sm.cscs.ch/stac/collections
 ```
 
 This token flow is for development smoke testing only. Production CSCS Keycloak should use the approved user/device/client flow for obtaining tokens.

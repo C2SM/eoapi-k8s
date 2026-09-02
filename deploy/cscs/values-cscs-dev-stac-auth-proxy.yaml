@@ -11,8 +11,8 @@ stac-auth-proxy:
         enabled: false
     env:
         UPSTREAM_URL: "http://eoapi-stac:8080"
-        OIDC_DISCOVERY_URL: "https://dex-eoapi-dev.c2sm-tds.c2sm.cscs.ch/.well-known/openid-configuration"
-        OIDC_DISCOVERY_INTERNAL_URL: "https://dex-eoapi-dev.c2sm-tds.c2sm.cscs.ch/.well-known/openid-configuration"
+        OIDC_DISCOVERY_URL: "https://dex-prometheus-dev.c2sm-tds.c2sm.cscs.ch/.well-known/openid-configuration"
+        OIDC_DISCOVERY_INTERNAL_URL: "https://dex-prometheus-dev.c2sm-tds.c2sm.cscs.ch/.well-known/openid-configuration"
         # eoapi-dev = oauth2-proxy's whole-site client; stac-browser = its own
         # Dex client for the in-app OIDC login (see dex-configmap.yaml). Same
         # audience-mismatch issue as oauth2-proxy's own oidc_extra_audiences,

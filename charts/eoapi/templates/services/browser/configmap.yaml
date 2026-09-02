@@ -1,17 +1,29 @@
-{{- if and .Values.browser.enabled .Values.browser.customConfig }}
+{{- if and .Values.browser.enabled (or .Values.browser.customConfig .Values.browser.favicon) }}
 apiVersion: v1
 kind: ConfigMap
 metadata:
   name: {{ .Release.Name }}-browser-config
 data:
+{{- if .Values.browser.customConfig }}
   browser_config.js: |-
 {{- .Values.browser.customConfig | nindent 4 }}
+{{- end }}
   50-browser-custom-config.sh: |-
     #!/bin/sh
     set -eu
+    {{- if .Values.browser.customConfig }}
     # Runs after the image's own 40-stac-browser-entrypoint.sh has generated
     # runtime-config.js from the SB_* env vars; append rather than overwrite so
     # that generated config survives. Content should assign extra properties
     # onto the already-defined window.STAC_BROWSER_CONFIG object.
     cat /etc/eoapi/browser/browser_config.js >> /usr/share/nginx/html/runtime-config.js
+    {{- end }}
+    {{- if .Values.browser.favicon }}
+    cp /etc/eoapi/browser/favicon.png /usr/share/nginx/html/favicon.png
+    sed -i 's|</head>|<link rel="icon" type="image/png" href="./favicon.png">\n  </head>|' /usr/share/nginx/html/index.html
+    {{- end }}
+{{- if .Values.browser.favicon }}
+binaryData:
+  favicon.png: {{ .Values.browser.favicon | quote }}
+{{- end }}
 {{- end }}

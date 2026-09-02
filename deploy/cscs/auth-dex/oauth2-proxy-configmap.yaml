@@ -11,9 +11,9 @@ data:
     http_address = "0.0.0.0:4180"
     provider = "oidc"
     provider_display_name = "Dex"
-    oidc_issuer_url = "https://dex-eoapi-dev.c2sm-tds.c2sm.cscs.ch"
+    oidc_issuer_url = "https://dex-prometheus-dev.c2sm-tds.c2sm.cscs.ch"
     oidc_groups_claim = "groups"
-    redirect_url = "https://eoapi-dev.c2sm-tds.c2sm.cscs.ch/oauth2/callback"
+    redirect_url = "https://prometheus-dev.c2sm-tds.c2sm.cscs.ch/oauth2/callback"
     proxy_prefix = "/oauth2"
     skip_provider_button = true
 

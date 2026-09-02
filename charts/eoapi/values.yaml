@@ -647,6 +647,11 @@ browser:
   # Do not reassign window.STAC_BROWSER_CONFIG itself, or the SB_*-generated
   # settings above will be lost.
   customConfig: ""
+  # Optional: base64-encoded PNG content for a custom favicon shown at
+  # /browser/. Kept separate from customConfig since it's a binary asset
+  # mounted and linked into index.html's <head>, not JS runtime config.
+  # Generate with e.g.: base64 -w0 favicon.png
+  favicon: ""
   # Custom catalog title
   catalogTitle: ""
   # Custom catalog image/logo URL

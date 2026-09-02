@@ -568,6 +568,10 @@
           "type": "string",
           "description": "JS appended after stac-browser's own runtime-config.js is generated, to set fields with no SB_* equivalent (e.g. buildTileUrlTemplate)"
         },
+        "favicon": {
+          "type": "string",
+          "description": "Base64-encoded PNG content for a custom favicon, linked into index.html's <head>"
+        },
         "settings": {
           "type": "object",
           "properties": {

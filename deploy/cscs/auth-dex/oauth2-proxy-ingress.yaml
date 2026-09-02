@@ -13,7 +13,7 @@ metadata:
 spec:
   ingressClassName: traefik
   rules:
-    - host: eoapi-dev.c2sm-tds.c2sm.cscs.ch
+    - host: prometheus-dev.c2sm-tds.c2sm.cscs.ch
       http:
         paths:
           - path: /oauth2
@@ -25,5 +25,5 @@ spec:
                   number: 4180
   tls:
     - hosts:
-        - eoapi-dev.c2sm-tds.c2sm.cscs.ch
+        - prometheus-dev.c2sm-tds.c2sm.cscs.ch
       secretName: eoapi-dev-tls
