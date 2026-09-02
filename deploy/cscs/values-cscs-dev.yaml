@@ -1,5 +1,5 @@
 # CSCS dev deployment for the c2sm-tds Kubernetes cluster.
-# Change the anchored storage class/size below to resize both Postgres data and pgBackRest repo PVCs.
+# Change the storage class and PVC sizes below for Postgres data and pgBackRest repo storage.
 
 ingress:
   enabled: true
@@ -121,8 +121,8 @@ postgrescluster:
           - "ReadWriteOnce"
         resources:
           requests:
-            storage: &cscsPostgresStorage "300Gi"
+            storage: "500Gi"
       resources: {}
   backupsEnabled: true
-  backupsSize: *cscsPostgresStorage
+  backupsSize: "300Gi"
   backupsStorageClassName: *cscsStorageClass
