@@ -15,6 +15,12 @@ data:
 
     web:
       http: 0.0.0.0:5556
+      # Without this, browsers block stac-browser's own oidc-client-ts fetch of
+      # this discovery doc (and the token endpoint) as a cross-origin request,
+      # since dex-eoapi-dev.* is a different origin than eoapi-dev.* (CORS is
+      # disabled by Dex when this list is empty).
+      allowedOrigins:
+        - https://eoapi-dev.c2sm-tds.c2sm.cscs.ch
 
     oauth2:
       skipApprovalScreen: true
@@ -26,6 +32,11 @@ data:
         secretEnv: DEX_EOAPI_CLIENT_SECRET
         redirectURIs:
           - https://eoapi-dev.c2sm-tds.c2sm.cscs.ch/oauth2/callback
+      - id: stac-browser
+        name: STAC Browser
+        public: true
+        redirectURIs:
+          - https://eoapi-dev.c2sm-tds.c2sm.cscs.ch/browser/auth
 
     enablePasswordDB: true
     staticPasswords:

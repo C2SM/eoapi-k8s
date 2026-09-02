@@ -566,7 +566,7 @@
         },
         "customConfig": {
           "type": "string",
-          "description": "Custom STAC Browser config.js content"
+          "description": "JS appended after stac-browser's own runtime-config.js is generated, to set fields with no SB_* equivalent (e.g. buildTileUrlTemplate)"
         },
         "settings": {
           "type": "object",

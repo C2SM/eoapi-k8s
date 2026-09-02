@@ -2,6 +2,8 @@ suite: stac browser custom config tests
 templates:
   - templates/services/browser/deployment.yaml
   - templates/services/browser/configmap.yaml
+  - templates/_helpers/core.tpl
+  - templates/_helpers/networking.tpl
 tests:
   - it: "stac browser custom config configmap"
     set:
@@ -11,9 +13,8 @@ tests:
       multidim.enabled: false
       browser.enabled: true
       browser.customConfig: |
-        window.STAC_BROWSER_CONFIG = {
-          catalogUrl: "https://example.com/stac",
-          useTileLayerAsFallback: false
+        window.STAC_BROWSER_CONFIG.buildTileUrlTemplate = function(asset) {
+          return null;
         };
       gitSha: "ABC123"
     template: templates/services/browser/configmap.yaml
@@ -25,10 +26,10 @@ tests:
           value: RELEASE-NAME-browser-config
       - matchRegex:
           path: data["browser_config.js"]
-          pattern: "catalogUrl: \"https://example.com/stac\""
+          pattern: "window.STAC_BROWSER_CONFIG.buildTileUrlTemplate = function"
       - matchRegex:
           path: data["50-browser-custom-config.sh"]
-          pattern: "cp /etc/eoapi/browser/browser_config.js /usr/share/nginx/html/config.js"
+          pattern: "cat /etc/eoapi/browser/browser_config.js >> /usr/share/nginx/html/runtime-config.js"
 
   - it: "stac browser deployment with custom config mounted"
     set:
@@ -38,8 +39,8 @@ tests:
       multidim.enabled: false
       browser.enabled: true
       browser.customConfig: |
-        window.STAC_BROWSER_CONFIG = {
-          catalogUrl: "https://example.com/stac"
+        window.STAC_BROWSER_CONFIG.buildTileUrlTemplate = function(asset) {
+          return null;
         };
       gitSha: "ABC123"
     template: templates/services/browser/deployment.yaml

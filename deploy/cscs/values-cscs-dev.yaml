@@ -43,36 +43,40 @@ browser:
     enabled: true
     path: "/browser"
   catalogUrl: "https://eoapi-dev.c2sm-tds.c2sm.cscs.ch/stac"
+  # Must be externally accessible; feeds the SB_authConfig openIdConnectUrl
+  # the chart generates for stac-browser's oidc-client-ts-based OIDC login.
+  oidcDiscoveryUrl: "https://dex-eoapi-dev.c2sm-tds.c2sm.cscs.ch/.well-known/openid-configuration"
+  # oauth2-proxy's whole-site gate requires a "groups" claim (allowed_groups
+  # in oauth2-proxy-configmap.yaml) to authorize a request; "openid" alone
+  # gets a token with no groups/email claims and a 401->redirect-to-login
+  # loop even though the token itself is otherwise valid.
+  oidcScope: "openid email profile groups"
+  catalogImage: "https://ethz.ch/content/dam/ethz/special-interest/usys/c2sm-dam/center/logos/logo_xlarge.gif"
+  footerLinks:
+    - label: "ETH Zürich"
+      url: "https://ethz.ch/"
+    - label: "C2SM"
+      url: "https://c2sm.ethz.ch/"
+  extraEnv:
+    - name: SB_useTileLayerAsFallback
+      value: "false"
+  # buildTileUrlTemplate has no SB_* equivalent (it's a JS callback), so it's
+  # the only thing left in customConfig; everything else above now flows
+  # through SB_* env vars into stac-browser's own runtime-config.js.
   customConfig: |
-    window.STAC_BROWSER_CONFIG = {
-      catalogUrl: "https://eoapi-dev.c2sm-tds.c2sm.cscs.ch/stac",
-      pathPrefix: "/browser/",
-      catalogImage: "https://ethz.ch/content/dam/ethz/special-interest/usys/c2sm-dam/center/logos/logo_xlarge.gif",
-      footerLinks: [
-        {
-          label: "ETH Zürich",
-          url: "https://ethz.ch/"
-        },
-        {
-          label: "C2SM",
-          url: "https://c2sm.ethz.ch/"
-        }
-      ],
-      useTileLayerAsFallback: false,
-      buildTileUrlTemplate: function(asset) {
-        var item = asset && typeof asset.getContext === "function" ? asset.getContext() : null;
-        var assetKey = asset && typeof asset.getKey === "function" ? asset.getKey() : null;
-        var collection = item && item.collection;
-        var itemId = item && item.id;
+    window.STAC_BROWSER_CONFIG.buildTileUrlTemplate = function(asset) {
+      var item = asset && typeof asset.getContext === "function" ? asset.getContext() : null;
+      var assetKey = asset && typeof asset.getKey === "function" ? asset.getKey() : null;
+      var collection = item && item.collection;
+      var itemId = item && item.id;
 
-        if (!collection || !itemId || !assetKey) {
-          return null;
-        }
-
-        return "https://eoapi-dev.c2sm-tds.c2sm.cscs.ch/raster/collections/" + encodeURIComponent(collection) +
-          "/items/" + encodeURIComponent(itemId) +
-          "/tiles/WebMercatorQuad/{z}/{x}/{y}.png?assets=" + encodeURIComponent(assetKey);
+      if (!collection || !itemId || !assetKey) {
+        return null;
       }
+
+      return "https://eoapi-dev.c2sm-tds.c2sm.cscs.ch/raster/collections/" + encodeURIComponent(collection) +
+        "/items/" + encodeURIComponent(itemId) +
+        "/tiles/WebMercatorQuad/{z}/{x}/{y}.png?assets=" + encodeURIComponent(assetKey);
     };
 
 multidim:

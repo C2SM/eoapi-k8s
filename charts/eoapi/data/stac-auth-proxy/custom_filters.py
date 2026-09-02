@@ -12,6 +12,11 @@ from urllib.request import Request, urlopen
 
 ADMIN_GROUP = "/eoapi-admin"
 
+# Collections tagged with this value in their own auth:groups metadata are
+# visible to everyone, authenticated or not - mark a collection public by
+# adding "public" to its auth:groups list.
+PUBLIC_AUTH_VALUE = "public"
+
 GROUP_AUTH_VALUES = {
     "/eoapi-noaa": "noaa",
     "/nasa-users": "nasa",
@@ -33,11 +38,13 @@ def _groups(context: dict[str, Any]) -> set[str]:
 
 
 def _authorized_auth_values(groups: set[str]) -> list[str]:
-    return [
+    values = [
         auth_value
         for group, auth_value in GROUP_AUTH_VALUES.items()
         if group in groups
     ]
+    values.append(PUBLIC_AUTH_VALUE)
+    return values
 
 
 def _auth_groups_filter(context: dict[str, Any]) -> str | dict[str, Any]:
@@ -47,9 +54,6 @@ def _auth_groups_filter(context: dict[str, Any]) -> str | dict[str, Any]:
         return "1=1"
 
     auth_values = _authorized_auth_values(groups)
-
-    if not auth_values:
-        return "1=0"
 
     if len(auth_values) == 1:
         return {
@@ -136,9 +140,6 @@ async def _items_auth_groups_filter(context: dict[str, Any]) -> str | dict[str, 
         return "1=1"
 
     auth_values = tuple(sorted(_authorized_auth_values(groups)))
-
-    if not auth_values:
-        return "1=0"
 
     collection_ids = await asyncio.to_thread(_load_allowed_collection_ids, auth_values)
 

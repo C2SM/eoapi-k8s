@@ -631,12 +631,21 @@ browser:
   # OIDC discovery URL for browser (must be externally accessible URL)
   # Required when stac-auth-proxy is enabled
   oidcDiscoveryUrl: ""
+  # OIDC scope requested by the browser's own login (oidc-client-ts). Widen
+  # this if anything downstream of the browser's token needs claims beyond
+  # "openid" alone, e.g. a group-based authorization check needing "groups".
+  oidcScope: "openid"
   # Optional: Override the STAC catalog URL for the browser
   # If not set, will be constructed from ingress.host and stac.ingress.path
   # Useful when using custom ingress solutions with ingress.enabled=false
   catalogUrl: ""
-  # Optional: Custom STAC Browser config.js content. Use this for settings that
-  # cannot be provided through SB_* environment variables, such as JS callbacks.
+  # Optional: extra JS appended after stac-browser generates its own
+  # runtime-config.js from the SB_* environment variables/values above. Only
+  # needed for settings with no SB_* equivalent, e.g. JS callbacks such as
+  # buildTileUrlTemplate. Assign onto the already-defined config object, e.g.:
+  #   window.STAC_BROWSER_CONFIG.buildTileUrlTemplate = function(asset) { ... };
+  # Do not reassign window.STAC_BROWSER_CONFIG itself, or the SB_*-generated
+  # settings above will be lost.
   customConfig: ""
   # Custom catalog title
   catalogTitle: ""

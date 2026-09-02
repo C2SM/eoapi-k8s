@@ -21,6 +21,33 @@ data:
     allowed_groups = ["/eoapi-dev-users"]
     scope = "openid email profile groups"
 
+    # oauth2-proxy's own client (below, via client-id) issues tokens with
+    # aud=eoapi-dev; stac-browser is a second Dex client (same issuer) whose
+    # tokens carry aud=stac-browser. Without this, oauth2-proxy's ForwardAuth
+    # rejects any Authorization: Bearer request from stac-browser with 403
+    # ("audience ... does not match with any of allowed audiences").
+    oidc_extra_audiences = ["stac-browser"]
+
+    # /stac already has its own dedicated auth layer (stac-auth-proxy: real
+    # JWT validation, DEFAULT_PUBLIC=true, clean JSON 401s, group-based CQL
+    # filtering via custom_filters.py). Double-gating it here breaks
+    # stac-browser's background XHR calls: this whole-site ForwardAuth gate
+    # answers an unauthenticated request with an HTML 302 to Dex, which a
+    # fetch()/XHR call auto-follows into a cross-origin, non-CORS-enabled
+    # page, surfacing as an opaque "CORS blocked" error - and a failed
+    # bearer-authenticated request here also clears the existing whole-site
+    # session cookie as a side effect, breaking cookie-only browsing too.
+    #
+    # /browser is skipped too so an anonymous visitor can reach the STAC
+    # Browser UI itself and see public collections without ever logging in -
+    # the UI is just static JS/HTML with nothing sensitive baked in; actual
+    # data access is still governed entirely by stac-auth-proxy's own
+    # auth:groups-based filtering on /stac, unaffected by this.
+    #
+    # /raster, /vector, /multidim have no auth proxy of their own yet, so
+    # they intentionally stay behind this gate.
+    skip_auth_routes = ["^/(stac|browser)(/|$)"]
+
     upstreams = ["static://202"]
     reverse_proxy = true
     set_xauthrequest = true
