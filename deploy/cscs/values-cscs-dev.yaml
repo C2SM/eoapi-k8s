@@ -82,6 +82,42 @@ browser:
         "/tiles/WebMercatorQuad/{z}/{x}/{y}.png?assets=" + encodeURIComponent(assetKey);
     };
 
+    // Read by the SaveToNarthex widget (github.com/C2SM/narthex, widget/widgets.config.js)
+    // once it's compiled into a custom browser image - see deploy/browser-narthex/.
+    // No effect on the stock stac-browser image deployed today.
+    window.STAC_BROWSER_CONFIG.narthexApiUrl = "https://prometheus-dev.c2sm-tds.c2sm.cscs.ch/narthex-api";
+    window.STAC_BROWSER_CONFIG.narthexAdminUrl = "https://prometheus-dev.c2sm-tds.c2sm.cscs.ch/narthex";
+
+narthex-backend:
+  enabled: true
+  ingress:
+    # Bypasses the shared chart Ingress entirely - see
+    # deploy/cscs/narthex-api-ingress.yaml for why (the shared
+    # eoapi-dev-oauth-errors middleware rewrites narthex-backend's own
+    # legitimate 401s into a redirect) and its dedicated Ingress/Middleware.
+    enabled: false
+  authMode: "oidc"
+  oidcIssuer: "https://dex-prometheus-dev.c2sm-tds.c2sm.cscs.ch"
+  oidcAudience: "narthex"
+  corsOrigins:
+    - "https://prometheus-dev.c2sm-tds.c2sm.cscs.ch"
+  # ghcr.io/c2sm/narthex-* packages are private - see deploy/cscs/README
+  # (or the auth-dex secrets convention) for how narthex-ghcr-pull-secret
+  # is created (kubectl create secret docker-registry, not via Helm).
+  imagePullSecrets:
+    - name: narthex-ghcr-pull-secret
+
+narthex-frontend:
+  enabled: true
+  ingress:
+    enabled: true
+  apiUrl: "https://prometheus-dev.c2sm-tds.c2sm.cscs.ch/narthex-api"
+  oidcIssuer: "https://dex-prometheus-dev.c2sm-tds.c2sm.cscs.ch"
+  oidcClientId: "narthex"
+  oidcRedirectUri: "https://prometheus-dev.c2sm-tds.c2sm.cscs.ch/narthex/auth/callback"
+  imagePullSecrets:
+    - name: narthex-ghcr-pull-secret
+
 multidim:
   enabled: false
 
@@ -133,3 +169,16 @@ postgrescluster:
   backupsEnabled: true
   backupsSize: "300Gi"
   backupsStorageClassName: *cscsStorageClass
+
+postgrescluster-narthex:
+  enabled: true
+  instances:
+    - name: "narthex"
+      replicas: 1
+      dataVolumeClaimSpec:
+        storageClassName: *cscsStorageClass
+        accessModes:
+          - "ReadWriteOnce"
+        resources:
+          requests:
+            storage: "20Gi"

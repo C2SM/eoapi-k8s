@@ -40,6 +40,11 @@ data:
         public: true
         redirectURIs:
           - https://prometheus-dev.c2sm-tds.c2sm.cscs.ch/browser/auth
+      - id: narthex
+        name: Narthex
+        public: true
+        redirectURIs:
+          - https://prometheus-dev.c2sm-tds.c2sm.cscs.ch/narthex/auth/callback
 
     enablePasswordDB: true
     staticPasswords:

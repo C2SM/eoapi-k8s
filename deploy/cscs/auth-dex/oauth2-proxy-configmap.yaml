@@ -44,9 +44,14 @@ data:
     # data access is still governed entirely by stac-auth-proxy's own
     # auth:groups-based filtering on /stac, unaffected by this.
     #
+    # /narthex (admin SPA) and /narthex-api are skipped for the same reason
+    # as /stac: narthex-backend does its own direct JWKS validation against
+    # Dex (NARTHEX_AUTH_MODE=oidc), so double-gating here would break its
+    # bearer-authenticated fetch() calls the same way it would for /stac.
+    #
     # /raster, /vector, /multidim have no auth proxy of their own yet, so
     # they intentionally stay behind this gate.
-    skip_auth_routes = ["^/(stac|browser)(/|$)"]
+    skip_auth_routes = ["^/(stac|browser|narthex|narthex-api)(/|$)"]
 
     upstreams = ["static://202"]
     reverse_proxy = true

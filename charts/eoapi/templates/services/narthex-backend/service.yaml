@@ -1,0 +1,14 @@
+{{- if index .Values "narthex-backend" "enabled" }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}-narthex-backend
+  labels:
+    app: {{ .Release.Name }}-narthex-backend
+spec:
+  ports:
+    - port: {{ (index .Values "narthex-backend" "service").port | default 8000 }}
+      targetPort: 8000
+  selector:
+    app: {{ .Release.Name }}-narthex-backend
+{{- end }}

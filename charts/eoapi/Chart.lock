@@ -2,6 +2,9 @@ dependencies:
 - name: postgrescluster
   repository: https://devseed.com/eoapi-k8s/
   version: 5.8.6
+- name: postgrescluster
+  repository: https://devseed.com/eoapi-k8s/
+  version: 5.8.6
 - name: eoapi-notifier
   repository: oci://ghcr.io/developmentseed/charts
   version: 0.1.0
@@ -23,5 +26,5 @@ dependencies:
 - name: stac-auth-proxy
   repository: oci://ghcr.io/developmentseed/stac-auth-proxy/charts
   version: 1.2.0
-digest: sha256:155889771b74fc70652ffbbf92e5313bedf04a83906eb7746da3b9ffc2e0aaf8
-generated: "2026-09-02T03:15:24.458914938Z"
+digest: sha256:c332f2da6441a9f6d9af641e3fab96adf2e318adea12fb0639acba8e1696192c
+generated: "2026-09-04T12:16:44.694965021+02:00"

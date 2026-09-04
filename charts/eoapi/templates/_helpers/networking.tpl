@@ -10,6 +10,8 @@ Browser remains on the main ingress; skipStripPrefix excludes it from Traefik st
   (dict "key" "vector")
   (dict "key" "multidim")
   (dict "key" "browser" "defaultPath" "/browser" "hasOwnPort" true "skipStripPrefix" true)
+  (dict "key" "narthex-backend" "defaultPath" "/narthex-api" "hasOwnPort" true)
+  (dict "key" "narthex-frontend" "defaultPath" "/narthex" "hasOwnPort" true)
   (dict "key" "mockOidcServer" "actualName" "mock-oidc-server" "hasOwnPort" true)
 -}}
 {{- $resolved := list -}}

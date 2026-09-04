@@ -11,3 +11,8 @@ __pycache__
 
 mock-oidc-server
 tmpcharts*
+
+# Local secrets / kubeconfigs - never commit these
+*.env
+c2sm-tds.yaml
+cookies.txt

@@ -32,6 +32,11 @@ dependencies:
     version: 5.8.6
     repository: https://devseed.com/eoapi-k8s/
     condition: postgrescluster.enabled
+  - name: postgrescluster
+    alias: postgrescluster-narthex
+    version: 5.8.6
+    repository: https://devseed.com/eoapi-k8s/
+    condition: postgrescluster-narthex.enabled
   - name: eoapi-notifier
     version: 0.1.0
     repository: oci://ghcr.io/developmentseed/charts

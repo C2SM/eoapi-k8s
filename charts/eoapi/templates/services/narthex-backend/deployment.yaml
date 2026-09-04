@@ -1,0 +1,93 @@
+{{- if index .Values "narthex-backend" "enabled" }}
+{{- $nb := index .Values "narthex-backend" }}
+{{- $pgName := (index .Values "postgrescluster-narthex" "name") | default "narthex" }}
+{{- $pgSecret := printf "%s-pguser-narthex" $pgName }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-narthex-backend
+  labels:
+    {{- include "eoapi.labels" . | nindent 4 }}
+    app.kubernetes.io/component: narthex-backend
+    app: {{ .Release.Name }}-narthex-backend
+    gitsha: {{ include "eoapi.gitSha" . }}
+spec:
+  replicas: {{ $nb.replicaCount | default 1 }}
+  selector:
+    matchLabels:
+      app: {{ .Release.Name }}-narthex-backend
+  template:
+    metadata:
+      labels:
+        {{- include "eoapi.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: narthex-backend
+        app: {{ .Release.Name }}-narthex-backend
+        {{- with $nb.settings.labels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      {{- with $nb.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: narthex-backend
+          image: {{ include "eoapi.containerImage" $nb.image }}
+          imagePullPolicy: {{ $nb.image.pullPolicy | default "IfNotPresent" }}
+          command:
+            - sh
+            - -c
+            - |
+              set -e
+              export NARTHEX_DB_URL="postgresql+psycopg://${PGUSER}:${PGPASSWORD}@${PGHOST}:${PGPORT}/${PGDATABASE}"
+              alembic upgrade head
+              exec uvicorn narthex.main:app --host 0.0.0.0 --port 8000
+          ports:
+            - containerPort: 8000
+          env:
+            - name: PGUSER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $pgSecret }}
+                  key: user
+            - name: PGPASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $pgSecret }}
+                  key: password
+            - name: PGHOST
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $pgSecret }}
+                  key: host
+            - name: PGPORT
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $pgSecret }}
+                  key: port
+            - name: PGDATABASE
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $pgSecret }}
+                  key: dbname
+            - name: NARTHEX_AUTH_MODE
+              value: {{ $nb.authMode | default "dev" | quote }}
+            {{- if eq $nb.authMode "oidc" }}
+            - name: NARTHEX_OIDC_ISSUER
+              value: {{ required "narthex-backend.oidcIssuer is required when authMode is oidc" $nb.oidcIssuer | quote }}
+            - name: NARTHEX_OIDC_AUDIENCE
+              value: {{ $nb.oidcAudience | default "narthex" | quote }}
+            - name: NARTHEX_LAUNCH_TOKEN_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ required "narthex-backend.launchTokenSecretName is required when authMode is oidc" $nb.launchTokenSecretName }}
+                  key: launch-token-secret
+            {{- end }}
+            {{- if $nb.corsOrigins }}
+            - name: NARTHEX_CORS_ORIGINS
+              value: {{ $nb.corsOrigins | toJson | quote }}
+            {{- end }}
+          resources:
+            {{- toYaml $nb.settings.resources | nindent 12 }}
+      serviceAccountName: {{ include "eoapi.serviceAccountName" . }}
+{{- end }}

@@ -1,0 +1,51 @@
+{{- if index .Values "narthex-frontend" "enabled" }}
+{{- $nf := index .Values "narthex-frontend" }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-narthex-frontend
+  labels:
+    {{- include "eoapi.labels" . | nindent 4 }}
+    app.kubernetes.io/component: narthex-frontend
+    app: {{ .Release.Name }}-narthex-frontend
+    gitsha: {{ include "eoapi.gitSha" . }}
+spec:
+  replicas: {{ $nf.replicaCount | default 1 }}
+  selector:
+    matchLabels:
+      app: {{ .Release.Name }}-narthex-frontend
+  template:
+    metadata:
+      labels:
+        {{- include "eoapi.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: narthex-frontend
+        app: {{ .Release.Name }}-narthex-frontend
+        {{- with $nf.settings.labels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      {{- with $nf.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: narthex-frontend
+          image: {{ include "eoapi.containerImage" $nf.image }}
+          imagePullPolicy: {{ $nf.image.pullPolicy | default "IfNotPresent" }}
+          ports:
+            - containerPort: 80
+          env:
+            - name: NARTHEX_API_URL
+              value: {{ $nf.apiUrl | quote }}
+            - name: NARTHEX_OIDC_ISSUER
+              value: {{ $nf.oidcIssuer | quote }}
+            - name: NARTHEX_OIDC_CLIENT_ID
+              value: {{ $nf.oidcClientId | default "narthex" | quote }}
+            - name: NARTHEX_OIDC_REDIRECT_URI
+              value: {{ $nf.oidcRedirectUri | quote }}
+            - name: NARTHEX_LAUNCH_CONFIGS_JSON
+              value: {{ $nf.launchConfigs | default list | toJson | quote }}
+          resources:
+            {{- toYaml $nf.settings.resources | nindent 12 }}
+      serviceAccountName: {{ include "eoapi.serviceAccountName" . }}
+{{- end }}

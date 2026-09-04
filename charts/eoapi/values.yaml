@@ -156,6 +156,39 @@ postgrescluster:
       password:
         type: AlphaNumeric
 
+# Second, independent postgrescluster instance (see the aliased dependency
+# entry in Chart.yaml) for the narthex service's own database — not shared
+# with the pgstac cluster above.
+postgrescluster-narthex:
+  enabled: false
+  name: "narthex"
+  postgresVersion: 16
+  pgBouncerReplicas: 1
+  monitoring: false
+  instances:
+    - name: narthex
+      replicas: 1
+      dataVolumeClaimSpec:
+        accessModes:
+          - "ReadWriteOnce"
+        resources:
+          requests:
+            storage: "5Gi"
+  users:
+    # Only used by the one-off narthex-superuser-init-db job (see
+    # templates/database/narthex-superuser-initdb.yaml) to reassign public
+    # schema ownership - PG15+ no longer grants CREATE on it to the
+    # database owner by default. Same reasoning as the pgstac cluster's own
+    # `postgres` user entry / eoap-superuser-initdb.yaml.
+    - name: postgres
+      databases:
+        - narthex
+      options: "SUPERUSER"
+    - name: narthex
+      databases:
+        - narthex
+      options: "CREATEDB"
+
 # `pgstacBootstrap` is a pod that by default runs pgstac schema migrations
 # and optionally loads some fixtures for testing and examples
 # using the LOAD_FIXTURES env var below
@@ -671,6 +704,83 @@ browser:
   # extraEnv:
   #   - name: SB_itemsPerPage
   #     value: "60"
+  settings:
+    labels: {}
+    resources: {}
+
+######################
+# NARTHEX
+######################
+# Named, server-side lists of STAC items/collections (saved from the
+# stac-browser SaveToNarthex widget), plus a small admin SPA. Source lives
+# in a separate repo (github.com/C2SM/narthex); these two services deploy
+# its published images. See narthex-backend.authMode below for local/dev
+# vs. real-OIDC auth.
+narthex-backend:
+  enabled: false
+  image:
+    name: ghcr.io/c2sm/narthex-backend
+    tag: "v1.0.0-alpha.2"
+    pullPolicy: IfNotPresent
+  service:
+    port: 8000
+  ingress:
+    enabled: true
+    path: "/narthex-api"
+  # "dev": any non-empty bearer token is accepted as the owner id (no OIDC
+  # issuer needed). "oidc": validates bearer tokens against oidcIssuer's
+  # JWKS with audience oidcAudience - set both when using "oidc".
+  authMode: "dev"
+  oidcIssuer: ""
+  oidcAudience: "narthex"
+  # Origins allowed to call this API (the narthex-frontend origin, and any
+  # stac-browser origin embedding the SaveToNarthex widget).
+  corsOrigins: []
+  # Name of a pre-existing Secret (created out-of-band, e.g. `kubectl create
+  # secret generic narthex-secrets --from-literal=launch-token-secret=...`)
+  # with a `launch-token-secret` key. Required outside of authMode "dev".
+  launchTokenSecretName: "narthex-secrets"
+  imagePullSecrets: []
+  settings:
+    labels: {}
+    resources: {}
+
+narthex-frontend:
+  enabled: false
+  image:
+    name: ghcr.io/c2sm/narthex-frontend
+    tag: "v1.0.0-alpha.2"
+    pullPolicy: IfNotPresent
+  service:
+    port: 80
+  ingress:
+    enabled: true
+    path: "/narthex"
+  # Public URL of narthex-backend's API (e.g. "https://<host>/narthex-api").
+  apiUrl: ""
+  # Empty oidcIssuer -> the SPA's own dev-mode token flow (matches
+  # narthex-backend.authMode "dev"). Set both to use real OIDC login.
+  oidcIssuer: ""
+  oidcClientId: "narthex"
+  # Must match a redirect URI registered for oidcClientId with the OIDC
+  # provider, e.g. "https://<host>/narthex/auth/callback".
+  oidcRedirectUri: ""
+  # JupyterHub/notebook launch targets (narthex's "Launch in JupyterHub"
+  # button) - passed through as NARTHEX_LAUNCH_CONFIGS_JSON (narthex
+  # frontend/src/launchConfigs.ts, as of narthex v1.0.0-alpha.2). Empty by
+  # default: an unset/empty list here means no Hub targets are offered, not
+  # a fallback to narthex's own dev-only defaults (those only apply to an
+  # unbuilt local `npm run dev` checkout, never a deployed image).
+  # Each entry is a JupyterHubLaunchConfig, e.g.:
+  #   - id: "santis"
+  #     label: "Santis"
+  #     jupyterHubUrl: "https://jupyter-santis.cscs.ch"
+  #     notebookApp: "narthex-launch"
+  #     uenv: "eobs-lab/1.0:v1"
+  #     venv: "/path/to/venv"
+  #     notebook: "named-list-viewer"
+  launchConfigs: []
+  imagePullSecrets: []
   settings:
     labels: {}
     resources: {}

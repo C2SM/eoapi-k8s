@@ -1,0 +1,14 @@
+{{- if index .Values "narthex-frontend" "enabled" }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}-narthex-frontend
+  labels:
+    app: {{ .Release.Name }}-narthex-frontend
+spec:
+  ports:
+    - port: {{ (index .Values "narthex-frontend" "service").port | default 80 }}
+      targetPort: 80
+  selector:
+    app: {{ .Release.Name }}-narthex-frontend
+{{- end }}

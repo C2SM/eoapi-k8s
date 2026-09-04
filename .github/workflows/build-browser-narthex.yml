@@ -1,0 +1,58 @@
+name: Build and push stac-browser + narthex widget image
+
+on:
+  workflow_dispatch:
+    inputs:
+      stac_browser_ref:
+        description: "stac-browser git ref to build (should match browser.image.tag in the chart values being targeted)"
+        required: true
+        default: "v5.0.0"
+      narthex_ref:
+        description: "narthex release tag whose narthex-widget.tar.bz2 asset to compile in - must have been built by narthex's release.yml (check the tag's GitHub Release has that asset attached)"
+        required: true
+        default: "v1.0.0-alpha.2"
+      image_tag:
+        description: "Tag to publish the built image as"
+        required: true
+        default: "v5.0.0-narthex.1"
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  image:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Lowercase image owner
+        id: owner
+        run: echo "name=${GITHUB_REPOSITORY_OWNER,,}" >> "$GITHUB_OUTPUT"
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: deploy/browser-narthex
+          push: true
+          # C2SM/narthex is private - the Dockerfile fetches its
+          # narthex-widget.tar.bz2 release asset via `gh release download`,
+          # which needs a token with at least read access to that repo.
+          # Add it as this repo's NARTHEX_REPO_TOKEN secret (a PAT or
+          # fine-grained token scoped to C2SM/narthex, contents:read).
+          # Passed as a BuildKit secret (not build-args) so it never lands
+          # in an image layer or build history.
+          secrets: |
+            narthex_repo_token=${{ secrets.NARTHEX_REPO_TOKEN }}
+          build-args: |
+            STAC_BROWSER_REF=${{ inputs.stac_browser_ref }}
+            NARTHEX_REF=${{ inputs.narthex_ref }}
+          tags: |
+            ghcr.io/${{ steps.owner.outputs.name }}/eoapi-browser-narthex:${{ inputs.image_tag }}
