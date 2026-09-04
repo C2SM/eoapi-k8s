@@ -1,0 +1,55 @@
+# Dedicated subdomain for narthex, mirroring auth-dex/dex-ingress.yaml's
+# pattern exactly: own host, own cert-manager-issued TLS cert (HTTP-01,
+# not a shared wildcard - cert-manager auto-provisions this the same way
+# it did for dex-prometheus-dev.*, picked up by the external-dns +
+# cert-manager pair already running in this cluster). Root serves the
+# admin SPA (narthex-frontend), /api serves the backend - narthex-backend
+# does its own independent auth (see backend/src/narthex/auth.py), so no
+# oauth2-proxy/oauth-errors middleware chain is attached here (same
+# reasoning as why the old deploy/cscs/narthex-api-ingress.yaml bypassed
+# eoapi-dev-oauth-errors - that whole problem doesn't exist here since
+# this host never has that middleware chain in the first place).
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: narthex-api-strip-prefix
+  namespace: eoapi-dev
+spec:
+  stripPrefix:
+    prefixes:
+      - /api
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: eoapi-dev-narthex
+  namespace: eoapi-dev
+  annotations:
+    cert-manager.io/cluster-issuer: "letsencrypt-http01-traefik"
+    traefik.ingress.kubernetes.io/router.entrypoints: "websecure"
+    traefik.ingress.kubernetes.io/router.tls: "true"
+    traefik.ingress.kubernetes.io/router.middlewares: "eoapi-dev-eoapi-dev-ipallowlist@kubernetescrd,eoapi-dev-narthex-api-strip-prefix@kubernetescrd"
+spec:
+  ingressClassName: traefik
+  rules:
+    - host: narthex-prometheus-dev.c2sm-tds.c2sm.cscs.ch
+      http:
+        paths:
+          - path: /api
+            pathType: Prefix
+            backend:
+              service:
+                name: eoapi-narthex-backend
+                port:
+                  number: 8000
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: eoapi-narthex-frontend
+                port:
+                  number: 80
+  tls:
+    - hosts:
+        - narthex-prometheus-dev.c2sm-tds.c2sm.cscs.ch
+      secretName: narthex-eoapi-dev-tls

@@ -654,6 +654,11 @@ browser:
     name: ghcr.io/radiantearth/stac-browser
     tag: "5.0.0"
     pullPolicy: IfNotPresent
+  # Only needed when browser.image points at a private registry package,
+  # e.g. a custom deploy/browser-narthex/ build published as
+  # ghcr.io/c2sm/eoapi-browser-narthex (the stock radiantearth image is
+  # public and needs none of this).
+  imagePullSecrets: []
   service:
     port: 8080
   ingress:

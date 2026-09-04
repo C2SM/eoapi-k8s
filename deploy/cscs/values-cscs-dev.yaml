@@ -39,6 +39,14 @@ vector:
 
 browser:
   enabled: true
+  # Custom build with the SaveToNarthex widget compiled in - see
+  # deploy/browser-narthex/. Private package, needs the same pull secret
+  # as narthex-backend/narthex-frontend.
+  image:
+    name: ghcr.io/c2sm/eoapi-browser-narthex
+    tag: "v5.0.0-narthex.1"
+  imagePullSecrets:
+    - name: narthex-ghcr-pull-secret
   ingress:
     enabled: true
     path: "/browser"
@@ -84,22 +92,29 @@ browser:
 
     // Read by the SaveToNarthex widget (github.com/C2SM/narthex, widget/widgets.config.js)
     // once it's compiled into a custom browser image - see deploy/browser-narthex/.
-    // No effect on the stock stac-browser image deployed today.
-    window.STAC_BROWSER_CONFIG.narthexApiUrl = "https://prometheus-dev.c2sm-tds.c2sm.cscs.ch/narthex-api";
-    window.STAC_BROWSER_CONFIG.narthexAdminUrl = "https://prometheus-dev.c2sm-tds.c2sm.cscs.ch/narthex";
+    window.STAC_BROWSER_CONFIG.narthexApiUrl = "https://narthex-prometheus-dev.c2sm-tds.c2sm.cscs.ch/api";
+    window.STAC_BROWSER_CONFIG.narthexAdminUrl = "https://narthex-prometheus-dev.c2sm-tds.c2sm.cscs.ch/";
 
+# narthex-backend/narthex-frontend live on their own dedicated subdomain
+# (narthex-prometheus-dev.*, mirroring dex-prometheus-dev.*) via
+# deploy/cscs/narthex-ingress.yaml, not the shared chart Ingress - both
+# ingress.enabled: false below. See that file for why (no
+# oauth2-proxy/oauth-errors middleware chain to fight there, unlike the
+# old path-based /narthex-api setup this replaced).
 narthex-backend:
   enabled: true
   ingress:
-    # Bypasses the shared chart Ingress entirely - see
-    # deploy/cscs/narthex-api-ingress.yaml for why (the shared
-    # eoapi-dev-oauth-errors middleware rewrites narthex-backend's own
-    # legitimate 401s into a redirect) and its dedicated Ingress/Middleware.
     enabled: false
   authMode: "oidc"
   oidcIssuer: "https://dex-prometheus-dev.c2sm-tds.c2sm.cscs.ch"
   oidcAudience: "narthex"
   corsOrigins:
+    # The admin SPA's own origin.
+    - "https://narthex-prometheus-dev.c2sm-tds.c2sm.cscs.ch"
+    # The SaveToNarthex widget's *actual* calling origin - it runs embedded
+    # inside stac-browser, so its fetch() calls come from prometheus-dev.*,
+    # not narthex-prometheus-dev.*. Without this, the widget's saves are
+    # silently blocked by CORS.
     - "https://prometheus-dev.c2sm-tds.c2sm.cscs.ch"
   # ghcr.io/c2sm/narthex-* packages are private - see deploy/cscs/README
   # (or the auth-dex secrets convention) for how narthex-ghcr-pull-secret
@@ -110,11 +125,11 @@ narthex-backend:
 narthex-frontend:
   enabled: true
   ingress:
-    enabled: true
-  apiUrl: "https://prometheus-dev.c2sm-tds.c2sm.cscs.ch/narthex-api"
+    enabled: false
+  apiUrl: "https://narthex-prometheus-dev.c2sm-tds.c2sm.cscs.ch/api"
   oidcIssuer: "https://dex-prometheus-dev.c2sm-tds.c2sm.cscs.ch"
   oidcClientId: "narthex"
-  oidcRedirectUri: "https://prometheus-dev.c2sm-tds.c2sm.cscs.ch/narthex/auth/callback"
+  oidcRedirectUri: "https://narthex-prometheus-dev.c2sm-tds.c2sm.cscs.ch/auth/callback"
   imagePullSecrets:
     - name: narthex-ghcr-pull-secret
 
