@@ -1,0 +1,14 @@
+stac-auth-proxy:
+  env:
+    UPSTREAM_URL: "http://eoapi-stac:8080"
+    OIDC_DISCOVERY_URL: "http://eoapi-mock-oidc-server.eoapi.svc.cluster.local:8080/.well-known/openid-configuration"
+    OIDC_DISCOVERY_INTERNAL_URL:
+      "http://eoapi-mock-oidc-server.eoapi.svc.cluster.local:8080/.well-known/openid-configuration"
+  initContainers:
+    - name: wait-for-mock-oidc
+      image: busybox:1.35
+
+      command: ['sh','-c','until nc -z eoapi-mock-oidc-server.eoapi.svc.cluster.local 8080; do echo waiting; sleep 2; done']
+    - name: wait-for-stac
+      image: busybox:1.35
+      command: ['sh','-c','until nc -z eoapi-stac.eoapi.svc.cluster.local 8080; do echo waiting; sleep 2; done']
