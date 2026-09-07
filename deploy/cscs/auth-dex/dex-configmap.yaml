@@ -21,6 +21,7 @@ data:
       # (CORS is disabled by Dex when this list is empty).
       allowedOrigins:
         - https://prometheus-dev.c2sm-tds.c2sm.cscs.ch
+        - https://narthex-prometheus-dev.c2sm-tds.c2sm.cscs.ch
 
     frontend:
       issuer: Prometheus
@@ -40,11 +41,12 @@ data:
         public: true
         redirectURIs:
           - https://prometheus-dev.c2sm-tds.c2sm.cscs.ch/browser/auth
-      - id: narthex
-        name: Narthex
-        public: true
-        redirectURIs:
-          - https://narthex-prometheus-dev.c2sm-tds.c2sm.cscs.ch/auth/callback
+      # No `narthex` client: the narthex admin SPA no longer runs its own
+      # OIDC flow. It sits behind oauth2-proxy's ForwardAuth gate (which
+      # uses the eoapi-dev client above) and receives an injected
+      # Authorization header, so one login covers every app on the family.
+      # See ../narthex-ingress.yaml and oauth2-proxy-configmap.yaml's
+      # cookie_domains.
 
     enablePasswordDB: true
     staticPasswords:

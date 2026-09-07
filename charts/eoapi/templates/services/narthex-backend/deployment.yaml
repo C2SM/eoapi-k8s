@@ -75,8 +75,8 @@ spec:
             {{- if eq $nb.authMode "oidc" }}
             - name: NARTHEX_OIDC_ISSUER
               value: {{ required "narthex-backend.oidcIssuer is required when authMode is oidc" $nb.oidcIssuer | quote }}
-            - name: NARTHEX_OIDC_AUDIENCE
-              value: {{ $nb.oidcAudience | default "narthex" | quote }}
+            - name: NARTHEX_OIDC_AUDIENCES
+              value: {{ $nb.oidcAudiences | default (list "narthex") | toJson | quote }}
             - name: NARTHEX_LAUNCH_TOKEN_SECRET
               valueFrom:
                 secretKeyRef:

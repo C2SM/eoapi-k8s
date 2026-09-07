@@ -725,7 +725,7 @@ narthex-backend:
   enabled: false
   image:
     name: ghcr.io/c2sm/narthex-backend
-    tag: "v1.0.0-alpha.2"
+    tag: "v1.0.0-alpha"
     pullPolicy: IfNotPresent
   service:
     port: 8000
@@ -734,10 +734,17 @@ narthex-backend:
     path: "/narthex-api"
   # "dev": any non-empty bearer token is accepted as the owner id (no OIDC
   # issuer needed). "oidc": validates bearer tokens against oidcIssuer's
-  # JWKS with audience oidcAudience - set both when using "oidc".
+  # JWKS, accepting any token whose `aud` matches one of oidcAudiences -
+  # set both when using "oidc". Needs more than one entry whenever more
+  # than one OIDC client calls this API with its own token, e.g. the
+  # narthex admin SPA's own client (aud "narthex") *and* a
+  # stac-browser-embedded widget reusing stac-browser's own session token
+  # (aud "stac-browser") - see narthex backend/src/narthex/config.py's
+  # oidc_audiences (plural) for why this can't be a single value.
   authMode: "dev"
   oidcIssuer: ""
-  oidcAudience: "narthex"
+  oidcAudiences:
+    - "narthex"
   # Origins allowed to call this API (the narthex-frontend origin, and any
   # stac-browser origin embedding the SaveToNarthex widget).
   corsOrigins: []
@@ -754,7 +761,7 @@ narthex-frontend:
   enabled: false
   image:
     name: ghcr.io/c2sm/narthex-frontend
-    tag: "v1.0.0-alpha.2"
+    tag: "v1.0.0-alpha"
     pullPolicy: IfNotPresent
   service:
     port: 80
@@ -763,6 +770,21 @@ narthex-frontend:
     path: "/narthex"
   # Public URL of narthex-backend's API (e.g. "https://<host>/narthex-api").
   apiUrl: ""
+  # "dev" | "oidc" | "proxy" (narthex frontend/src/runtimeConfig.ts):
+  #  - dev:   any non-empty bearer token, its value *is* the owner id
+  #  - oidc:  the SPA runs its own OIDC client and attaches the token itself
+  #  - proxy: an upstream auth proxy (e.g. oauth2-proxy via ForwardAuth) has
+  #           already authenticated the user and injects the bearer token
+  #           into every forwarded request - no OIDC client in the browser,
+  #           no Authorization header set by the SPA. The oidc* values below
+  #           are unused in this mode.
+  # Empty falls back to narthex's own inference (oidc if oidcIssuer is set,
+  # else dev), preserving pre-NARTHEX_AUTH_MODE behaviour.
+  authMode: ""
+  # proxy mode only: where the logout control sends the browser, since
+  # sign-out belongs to the proxy (e.g. "https://<host>/oauth2/sign_out").
+  # Unset hides the logout control entirely.
+  logoutUrl: ""
   # Empty oidcIssuer -> the SPA's own dev-mode token flow (matches
   # narthex-backend.authMode "dev"). Set both to use real OIDC login.
   oidcIssuer: ""

@@ -1,14 +1,35 @@
 # Dedicated subdomain for narthex, mirroring auth-dex/dex-ingress.yaml's
-# pattern exactly: own host, own cert-manager-issued TLS cert (HTTP-01,
-# not a shared wildcard - cert-manager auto-provisions this the same way
-# it did for dex-prometheus-dev.*, picked up by the external-dns +
-# cert-manager pair already running in this cluster). Root serves the
-# admin SPA (narthex-frontend), /api serves the backend - narthex-backend
-# does its own independent auth (see backend/src/narthex/auth.py), so no
-# oauth2-proxy/oauth-errors middleware chain is attached here (same
-# reasoning as why the old deploy/cscs/narthex-api-ingress.yaml bypassed
-# eoapi-dev-oauth-errors - that whole problem doesn't exist here since
-# this host never has that middleware chain in the first place).
+# pattern: own host, own cert-manager-issued TLS cert (HTTP-01, not a
+# shared wildcard - auto-provisioned by the external-dns + cert-manager
+# pair already running in this cluster).
+#
+# Both apps sit behind oauth2-proxy's ForwardAuth gate, which is the single
+# session authority for the whole *.c2sm-tds.c2sm.cscs.ch family (see
+# auth-dex/oauth2-proxy-configmap.yaml's cookie_domains/whitelist_domains).
+# That is what makes one login cover both prometheus-dev.* and
+# narthex-prometheus-dev.*: Dex has no browser SSO session of its own in any
+# released version, so every distinct OIDC client_id would otherwise force a
+# fresh interactive login.
+#
+# Deliberately split into TWO Ingress resources because Traefik's
+# router.middlewares annotation is per-Ingress, and the two paths need
+# different chains:
+#
+#   /      (SPA)      ipallowlist -> narthex-oauth-errors -> oauth-forwardauth
+#                     The errors middleware rewrites ForwardAuth's 401 into a
+#                     redirect to the login flow, which is what we want for a
+#                     browser hitting the app anonymously.
+#
+#   /api   (backend)  ipallowlist -> oauth-forwardauth -> strip-prefix
+#                     NO errors middleware: it rewrites *any* 401/403 from any
+#                     backend into an HTML redirect, which would mangle
+#                     narthex-backend's own clean JSON 401s (and, previously,
+#                     silently broke the widget's fetch() calls).
+#
+# The stac-browser SaveToNarthex widget calls /api cross-origin with an
+# explicit Bearer token (aud=stac-browser) and no session cookie; that path
+# survives the ForwardAuth gate via oauth2-proxy's skip_jwt_bearer_tokens +
+# oidc_extra_audiences settings.
 apiVersion: traefik.io/v1alpha1
 kind: Middleware
 metadata:
@@ -19,16 +40,79 @@ spec:
     prefixes:
       - /api
 ---
+# Same as eoapi-dev-oauth-errors, but sends the user back to narthex after
+# login instead of to /browser/ (that one's rd is hardcoded to the STAC
+# browser). Cross-host rd targets are only honoured because
+# whitelist_domains covers this subdomain.
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: narthex-oauth-errors
+  namespace: eoapi-dev
+spec:
+  errors:
+    status:
+      - "401-403"
+    service:
+      name: eoapi-dev-oauth2-proxy
+      port: 4180
+    query: /oauth2/sign_in?rd=https://narthex-prometheus-dev.c2sm-tds.c2sm.cscs.ch/
+    statusRewrites:
+      "401": 302
+---
+# CORS preflights must bypass the ForwardAuth gate. Traefik's ForwardAuth
+# always calls the auth server with GET (the real method only travels in
+# X-Forwarded-Method), so oauth2-proxy never sees an OPTIONS and its own
+# skip_auth_preflight can't fire - the exemption has to happen here, at the
+# router. Browsers send preflights with no Authorization header and no
+# cookie by spec, so without this the gate 401s the preflight and the real
+# request is never sent (this is what broke the stac-browser widget's
+# cross-origin calls).
+#
+# Only cross-origin callers preflight at all: the admin SPA's own calls are
+# same-origin (/api under its own host) and never reach this route. The
+# actual request behind an allowed preflight is still fully authenticated -
+# either by the gate, or by narthex-backend's own JWKS validation of an
+# explicit Bearer token (the widget's path).
+#
+# Needs an IngressRoute rather than an Ingress because method matching
+# isn't expressible in a plain k8s Ingress. Priority must exceed the /api
+# Ingress's 1000.
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: eoapi-dev-narthex-api-preflight
+  namespace: eoapi-dev
+spec:
+  entryPoints:
+    - websecure
+  routes:
+    - kind: Rule
+      match: Host(`narthex-prometheus-dev.c2sm-tds.c2sm.cscs.ch`) && PathPrefix(`/api`) && Method(`OPTIONS`)
+      priority: 2000
+      middlewares:
+        - name: eoapi-dev-ipallowlist
+        - name: narthex-api-strip-prefix
+      services:
+        - name: eoapi-narthex-backend
+          port: 8000
+  tls:
+    secretName: narthex-eoapi-dev-tls
+---
+# API first, with an explicit high priority: /api and / live in separate
+# Ingress objects here, and Traefik's automatic longest-rule-wins priority
+# was observed not to reliably prefer the more specific path across
+# resources. Pin it rather than rely on that.
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: eoapi-dev-narthex
+  name: eoapi-dev-narthex-api
   namespace: eoapi-dev
   annotations:
-    cert-manager.io/cluster-issuer: "letsencrypt-http01-traefik"
     traefik.ingress.kubernetes.io/router.entrypoints: "websecure"
     traefik.ingress.kubernetes.io/router.tls: "true"
-    traefik.ingress.kubernetes.io/router.middlewares: "eoapi-dev-eoapi-dev-ipallowlist@kubernetescrd,eoapi-dev-narthex-api-strip-prefix@kubernetescrd"
+    traefik.ingress.kubernetes.io/router.middlewares: "eoapi-dev-eoapi-dev-ipallowlist@kubernetescrd,eoapi-dev-eoapi-dev-oauth-forwardauth@kubernetescrd,eoapi-dev-narthex-api-strip-prefix@kubernetescrd"
+    traefik.ingress.kubernetes.io/router.priority: "1000"
 spec:
   ingressClassName: traefik
   rules:
@@ -42,6 +126,30 @@ spec:
                 name: eoapi-narthex-backend
                 port:
                   number: 8000
+  tls:
+    - hosts:
+        - narthex-prometheus-dev.c2sm-tds.c2sm.cscs.ch
+      secretName: narthex-eoapi-dev-tls
+---
+# Root/SPA. Carries the cert-manager annotation (only one Ingress may own
+# the shared narthex-eoapi-dev-tls secret, or cert-manager would race
+# itself creating two Certificates for the same secret name).
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: eoapi-dev-narthex
+  namespace: eoapi-dev
+  annotations:
+    cert-manager.io/cluster-issuer: "letsencrypt-http01-traefik"
+    traefik.ingress.kubernetes.io/router.entrypoints: "websecure"
+    traefik.ingress.kubernetes.io/router.tls: "true"
+    traefik.ingress.kubernetes.io/router.middlewares: "eoapi-dev-eoapi-dev-ipallowlist@kubernetescrd,eoapi-dev-narthex-oauth-errors@kubernetescrd,eoapi-dev-eoapi-dev-oauth-forwardauth@kubernetescrd"
+spec:
+  ingressClassName: traefik
+  rules:
+    - host: narthex-prometheus-dev.c2sm-tds.c2sm.cscs.ch
+      http:
+        paths:
           - path: /
             pathType: Prefix
             backend:

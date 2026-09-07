@@ -53,6 +53,14 @@ data:
     # they intentionally stay behind this gate.
     skip_auth_routes = ["^/(stac|browser)(/|$)"]
 
+    # CORS preflights carry no Authorization header and no cookie (browsers
+    # strip credentials from OPTIONS by spec), so ForwardAuth would reject
+    # them and the real request would never be sent. That breaks the
+    # stac-browser SaveToNarthex widget, whose calls to narthex's /api are
+    # cross-origin. Let preflights through; the actual request behind them
+    # is still fully authenticated.
+    skip_auth_preflight = true
+
     upstreams = ["static://202"]
     reverse_proxy = true
     set_xauthrequest = true
@@ -64,3 +72,19 @@ data:
     cookie_name = "__Secure-eoapi-dev-oauth2"
     cookie_secure = true
     cookie_samesite = "lax"
+
+    # Scope the session cookie to the shared parent domain so ONE login
+    # covers every app on the family (prometheus-dev.*, and
+    # narthex-prometheus-dev.* which sits behind the same ForwardAuth gate).
+    # This is what makes oauth2-proxy - not Dex - the session authority:
+    # Dex has no browser SSO session in any released version (the
+    # `sessions:` feature with ssoSharedWithDefault is master-only, see
+    # dexidp/dex#4560), so each distinct OIDC client_id would otherwise
+    # force a fresh interactive login on every app switch.
+    #
+    # whitelist_domains is required for the post-login `rd` redirect to be
+    # allowed to land on a *different* host than the one that started the
+    # flow (see narthex-oauth-errors in ../narthex-ingress.yaml, whose rd
+    # points back at the narthex subdomain).
+    cookie_domains = [".c2sm-tds.c2sm.cscs.ch"]
+    whitelist_domains = [".c2sm-tds.c2sm.cscs.ch"]

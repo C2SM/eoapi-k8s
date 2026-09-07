@@ -37,6 +37,10 @@ spec:
           env:
             - name: NARTHEX_API_URL
               value: {{ $nf.apiUrl | quote }}
+            - name: NARTHEX_AUTH_MODE
+              value: {{ $nf.authMode | quote }}
+            - name: NARTHEX_LOGOUT_URL
+              value: {{ $nf.logoutUrl | quote }}
             - name: NARTHEX_OIDC_ISSUER
               value: {{ $nf.oidcIssuer | quote }}
             - name: NARTHEX_OIDC_CLIENT_ID
