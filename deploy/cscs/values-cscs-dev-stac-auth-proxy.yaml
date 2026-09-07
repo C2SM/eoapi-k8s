@@ -11,13 +11,24 @@ stac-auth-proxy:
         enabled: false
     env:
         UPSTREAM_URL: "http://eoapi-stac:8080"
-        OIDC_DISCOVERY_URL: "https://dex-prometheus-dev.c2sm-tds.c2sm.cscs.ch/.well-known/openid-configuration"
-        OIDC_DISCOVERY_INTERNAL_URL: "https://dex-prometheus-dev.c2sm-tds.c2sm.cscs.ch/.well-known/openid-configuration"
-        # eoapi-dev = oauth2-proxy's whole-site client; stac-browser = its own
-        # Dex client for the in-app OIDC login (see dex-configmap.yaml). Same
-        # audience-mismatch issue as oauth2-proxy's own oidc_extra_audiences,
-        # but this is stac-auth-proxy's separate, independent JWT check.
-        ALLOWED_JWT_AUDIENCES: "eoapi-dev,stac-browser"
+        OIDC_DISCOVERY_URL: "https://auth-prometheus-dev.c2sm-tds.c2sm.cscs.ch/.well-known/openid-configuration"
+        OIDC_DISCOVERY_INTERNAL_URL: "https://auth-prometheus-dev.c2sm-tds.c2sm.cscs.ch/.well-known/openid-configuration"
+        # Only one audience reaches /stac: stac-browser's own access token, from
+        # its in-app OIDC login (client `stac-browser` in
+        # deploy/cscs/auth-authelia/authelia-configmap.yaml). Under Dex this
+        # also had to list oauth2-proxy's client, because that gate covered the
+        # whole eoAPI host and injected its id_token into /stac requests too.
+        # Nothing injects a header here now - Authelia's ForwardAuth does not,
+        # and /stac is `bypass` in its access_control anyway - so this is the
+        # complete list.
+        #
+        # This is an ACCESS token audience. Authelia mints opaque access tokens
+        # by default and grants no audience at all unless the client asks, so
+        # the client sets `access_token_signed_response_alg: RS256` plus
+        # `requested_audience_mode: implicit` to get a JWT whose aud is its own
+        # client_id. This check is entirely independent of narthex-backend's own
+        # oidcAudiences list.
+        ALLOWED_JWT_AUDIENCES: "stac-browser"
         ROOT_PATH: "/stac"
         ROOT_PATH_SKIP_PREFIXES: "/raster,/vector,/browser,/multidim"
         OVERRIDE_HOST: "false"

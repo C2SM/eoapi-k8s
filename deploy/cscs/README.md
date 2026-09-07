@@ -33,56 +33,58 @@ The ingress middleware annotation uses Traefik's Kubernetes CRD reference form:
 eoapi-dev-eoapi-dev-ipallowlist@kubernetescrd
 ```
 
-## Dex/OIDC Dev Auth
+## Authelia/OIDC Dev Auth
 
-`deploy/cscs/auth-dex/` is the active CSCS dev auth path. It adds a local Dex OIDC provider, oauth2-proxy, and Traefik ForwardAuth/errors middlewares. The setup keeps the Traefik IP allowlist on eoAPI and `/oauth2`, requests OIDC groups, forwards identity headers to eoAPI backends, and does not implement dataset-level authorization. Dex discovery is intentionally reachable without the IP allowlist so oauth2-proxy can initialize from inside the cluster.
+`deploy/cscs/auth-authelia/` is the active CSCS dev auth path. Authelia is the OIDC provider, the shared session authority, and the Traefik ForwardAuth gate for most of the stack. It replaces Dex, which had no server-side browser session in any released version — so every distinct OIDC `client_id` forced a fresh login, and stac-browser then narthex meant logging in twice. Authelia keeps one session across clients: the hop is now a single silent authorization round-trip.
 
-Create the Dex and oauth2-proxy secrets without committing real values:
+Authelia's ForwardAuth gate covers what has no auth layer of its own — `/raster`, `/vector`, `/multidim` and the `/` doc server — and issues the login redirect itself, so no Traefik `errors` middleware is needed there. `/stac` is fronted by stac-auth-proxy and `/browser` is public static UI, both `bypass` rules in Authelia's `access_control`.
 
-```bash
-DEX_CLIENT_SECRET=$(openssl rand -base64 32 | tr '+/' '-_' | tr -d '\n')
-OAUTH2_COOKIE_SECRET=$(openssl rand -base64 32 | tr '+/' '-_' | tr -d '\n')
+oauth2-proxy survives, gating the narthex subdomain only. Authelia's ForwardAuth cannot inject a JWT (it sets `Remote-User`/`Remote-Groups`/`Remote-Email`/`Remote-Name`) and narthex-backend authenticates by validating a bearer token, so oauth2-proxy stays purely for `set_authorization_header`. `auth-authelia/README.md` explains why narthex is not running as its own OIDC client instead, and exactly what to change once it can.
 
-read -rsp 'Dex kservis password: ' KSERVIS_PASSWORD; echo
-KSERVIS_HASH=$(printf '%s\n' "$KSERVIS_PASSWORD" | htpasswd -BinC 10 kservis | cut -d: -f2)
+The Traefik IP allowlist stays on everything except Authelia's own host, which must be publicly reachable for Let's Encrypt HTTP-01 and OIDC discovery.
 
-read -rsp 'Dex noaa-reader password: ' NOAA_READER_PASSWORD; echo
-NOAA_READER_HASH=$(printf '%s\n' "$NOAA_READER_PASSWORD" | htpasswd -BinC 10 noaa-reader | cut -d: -f2)
-
-read -rsp 'Dex nasa-reader password: ' NASA_READER_PASSWORD; echo
-NASA_READER_HASH=$(printf '%s\n' "$NASA_READER_PASSWORD" | htpasswd -BinC 10 nasa-reader | cut -d: -f2)
-
-read -rsp 'Dex dyamond-reader password: ' DYAMOND_READER_PASSWORD; echo
-DYAMOND_READER_HASH=$(printf '%s\n' "$DYAMOND_READER_PASSWORD" | htpasswd -BinC 10 dyamond-reader | cut -d: -f2)
-
-kubectl -n eoapi-dev create secret generic dex-secret \
-  --from-literal=client-secret="$DEX_CLIENT_SECRET" \
-  --from-literal=kservis-user-hash="$KSERVIS_HASH" \
-  --from-literal=noaa-reader-user-hash="$NOAA_READER_HASH" \
-  --from-literal=nasa-reader-user-hash="$NASA_READER_HASH" \
-  --from-literal=dyamond-reader-user-hash="$DYAMOND_READER_HASH"
-
-kubectl -n eoapi-dev create secret generic oauth2-proxy-dex-secret \
-  --from-literal=client-id='eoapi-dev' \
-  --from-literal=client-secret="$DEX_CLIENT_SECRET" \
-  --from-literal=cookie-secret="$OAUTH2_COOKIE_SECRET"
-```
-
-Apply the Dex auth manifests:
+Create the Authelia secret without committing real values:
 
 ```bash
-kubectl apply -f deploy/cscs/auth-dex/
+SESSION_SECRET=$(openssl rand -hex 64)
+STORAGE_ENCRYPTION_KEY=$(openssl rand -hex 64)
+OIDC_HMAC_SECRET=$(openssl rand -hex 64)
+IDENTITY_VALIDATION_JWT_SECRET=$(openssl rand -hex 64)
+
+openssl genrsa -out oidc-jwks.pem 4096
+
+# users-database.yml carries argon2 password hashes - see
+# deploy/cscs/auth-authelia/examples/users-database.yml and the README for
+# generating them with `authelia crypto hash generate argon2`.
+
+kubectl -n eoapi-dev create secret generic authelia-secret \
+  --from-literal=session-secret="$SESSION_SECRET" \
+  --from-literal=storage-encryption-key="$STORAGE_ENCRYPTION_KEY" \
+  --from-literal=oidc-hmac-secret="$OIDC_HMAC_SECRET" \
+  --from-literal=identity-validation-jwt-secret="$IDENTITY_VALIDATION_JWT_SECRET" \
+  --from-file=oidc-jwks.pem=./oidc-jwks.pem \
+  --from-file=users-database.yml=./users-database.yml
 ```
 
-Install or upgrade with the Dex auth overlay after the base CSCS values:
+`stac-browser` is a public client using PKCE and has no secret. oauth2-proxy's `eoapi-narthex` client is confidential; Authelia stores only a `$pbkdf2-sha512$` digest of its secret, injected from the same Secret at startup, so neither the secret nor the digest is in git. See `auth-authelia/README.md` for both commands.
+
+Apply the auth manifests and the narthex ingress:
+
+```bash
+kubectl apply -f deploy/cscs/auth-authelia/
+kubectl apply -f deploy/cscs/narthex-ingress.yaml
+```
+
+Install or upgrade with **all three** values files. Omitting the stac-auth-proxy overlay silently disables group filtering *and* the browser login button:
 
 ```bash
 helm upgrade --install eoapi ./charts/eoapi \
   -n eoapi-dev \
   --create-namespace \
   -f deploy/cscs/values-cscs-dev.yaml \
-  -f deploy/cscs/values-cscs-dev-auth-dex.yaml \
+  -f deploy/cscs/values-cscs-dev-stac-auth-proxy.yaml \
+  -f deploy/cscs/values-cscs-dev-auth-authelia.yaml \
   --set gitSha=$(git rev-parse HEAD | cut -c1-10)
 ```
 
-See `deploy/cscs/auth-dex/README.md` for the Dex discovery URL, local static users, Keycloak-style group examples, validation commands, backend header verification, and bearer-token curl flow.
+See `deploy/cscs/auth-authelia/README.md` for the discovery URL, the local users and their slash-prefixed groups, the non-obvious per-client OIDC settings (opaque-vs-JWT access tokens, audience granting, claims policies), validation commands, and why bearer-token curl testing is no longer available.

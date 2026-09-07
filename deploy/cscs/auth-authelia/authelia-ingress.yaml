@@ -1,0 +1,44 @@
+# Authelia gets its own host, mirroring the dex-prometheus-dev.* pattern it
+# replaces. cert-manager (HTTP-01) issues the cert and external-dns creates the
+# DNS record straight from this Ingress - a new host needs neither manual step.
+#
+# Deliberately NOT behind eoapi-dev-ipallowlist, and obviously not behind its
+# own ForwardAuth middleware:
+#   - Let's Encrypt HTTP-01 validation must reach it from the public internet;
+#   - OIDC discovery and the JWKS document must be fetchable by stac-auth-proxy
+#     and narthex-backend from inside the cluster at the public issuer URL.
+# If discovery starts returning 403, check that no allowlist middleware has
+# crept onto this Ingress.
+#
+# The login form is therefore publicly reachable, which is why the config
+# enables Authelia's `regulation` (retry limit + temporary ban). Dex had no
+# equivalent protection.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: eoapi-dev-authelia
+  namespace: eoapi-dev
+  labels:
+    app.kubernetes.io/name: authelia
+    app.kubernetes.io/part-of: eoapi-dev-auth-authelia
+  annotations:
+    cert-manager.io/cluster-issuer: "letsencrypt-http01-traefik"
+    traefik.ingress.kubernetes.io/router.entrypoints: "websecure"
+    traefik.ingress.kubernetes.io/router.tls: "true"
+spec:
+  ingressClassName: traefik
+  rules:
+    - host: auth-prometheus-dev.c2sm-tds.c2sm.cscs.ch
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: eoapi-dev-authelia
+                port:
+                  number: 9091
+  tls:
+    - hosts:
+        - auth-prometheus-dev.c2sm-tds.c2sm.cscs.ch
+      secretName: authelia-eoapi-dev-tls

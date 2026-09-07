@@ -64,11 +64,13 @@ browser:
   favicon: "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"
   # Must be externally accessible; feeds the SB_authConfig openIdConnectUrl
   # the chart generates for stac-browser's oidc-client-ts-based OIDC login.
-  oidcDiscoveryUrl: "https://dex-prometheus-dev.c2sm-tds.c2sm.cscs.ch/.well-known/openid-configuration"
-  # oauth2-proxy's whole-site gate requires a "groups" claim (allowed_groups
-  # in oauth2-proxy-configmap.yaml) to authorize a request; "openid" alone
-  # gets a token with no groups/email claims and a 401->redirect-to-login
-  # loop even though the token itself is otherwise valid.
+  oidcDiscoveryUrl: "https://auth-prometheus-dev.c2sm-tds.c2sm.cscs.ch/.well-known/openid-configuration"
+  # The "groups" scope is what gets group membership into the token at all.
+  # Authelia additionally needs a claims policy to copy `groups` out of
+  # /userinfo and into the tokens themselves (see auth-authelia's
+  # claims_policies.eoapi) - without both halves, stac-auth-proxy's
+  # custom_filters.py sees no groups and every user is reduced to the public
+  # collections.
   oidcScope: "openid email profile groups"
   catalogImage: "https://ethz.ch/content/dam/ethz/special-interest/usys/c2sm-dam/center/logos/logo_xlarge.gif"
   footerLinks:
@@ -106,17 +108,25 @@ browser:
     window.STAC_BROWSER_CONFIG.narthexAdminUrl = "https://narthex-prometheus-dev.c2sm-tds.c2sm.cscs.ch";
 
 # narthex-backend/narthex-frontend live on their own dedicated subdomain
-# (narthex-prometheus-dev.*, mirroring dex-prometheus-dev.*) via
+# (narthex-prometheus-dev.*, mirroring auth-prometheus-dev.*) via
 # deploy/cscs/narthex-ingress.yaml, not the shared chart Ingress - both
 # ingress.enabled: false below.
 #
-# Both sit behind oauth2-proxy's ForwardAuth gate, which is the single
-# session authority for the whole *.c2sm-tds.c2sm.cscs.ch family (its
-# cookie is scoped to the parent domain). One login therefore covers both
-# prometheus-dev.* and narthex-prometheus-dev.*, working around Dex having
-# no browser SSO session in any released version. oauth2-proxy injects
-# `Authorization: Bearer <id_token>` (aud=eoapi-dev) upstream, so the
-# backend needs no code change - just that audience below.
+# This host is the one place still behind oauth2-proxy's ForwardAuth gate
+# rather than Authelia's. Authelia's ForwardAuth cannot inject a JWT (it only
+# sets Remote-User/Remote-Groups/Remote-Email/Remote-Name) and this backend
+# authenticates by validating a bearer token, so oauth2-proxy stays purely for
+# its `set_authorization_header`. See
+# deploy/cscs/auth-authelia/oauth2-proxy-configmap.yaml for why the obvious
+# alternative - narthex-frontend authMode "oidc", the SPA as its own OIDC
+# client - is not in use: it works, but narthex's own first-load redirect race
+# makes it take 17-46 seconds.
+#
+# It is still ONE login for the whole family: oauth2-proxy is an Authelia
+# client, so its login completes silently against the Authelia session the user
+# already has. Under Dex this needed oauth2-proxy's cookie scoped to the parent
+# domain, making it rather than the IdP the session authority, because Dex had
+# no browser session in any released version.
 narthex-backend:
   enabled: true
   # v1.0.0-alpha is a mutable tag getting force-moved during active
@@ -127,14 +137,19 @@ narthex-backend:
   ingress:
     enabled: false
   authMode: "oidc"
-  oidcIssuer: "https://dex-prometheus-dev.c2sm-tds.c2sm.cscs.ch"
+  oidcIssuer: "https://auth-prometheus-dev.c2sm-tds.c2sm.cscs.ch"
+  # Both are Authelia clients. The tokens reaching this backend are JWTs whose
+  # aud is the issuing client_id, which for the widget's access token needs
+  # Authelia's `access_token_signed_response_alg: RS256` (its access tokens are
+  # opaque by default) and `requested_audience_mode: implicit` (it grants no
+  # audience at all unless the client asks, and oidc-client-ts never asks).
   oidcAudiences:
-    # oauth2-proxy's own client: the token it injects for any request that
-    # passes its ForwardAuth gate (i.e. the admin SPA's own API calls).
-    - "eoapi-dev"
-    # Widget-embedded save calls arrive with stac-browser's own session
-    # token (aud=stac-browser) instead, since that path is cross-origin and
-    # carries an explicit Bearer header rather than the proxy's cookie.
+    # oauth2-proxy's client: the id_token it injects for any request that
+    # passes its ForwardAuth gate, i.e. the admin SPA's own API calls.
+    - "eoapi-narthex"
+    # Widget-embedded save calls arrive with stac-browser's own access token
+    # (aud=stac-browser) instead: that path is cross-origin and carries an
+    # explicit Bearer header set by the widget.
     - "stac-browser"
   corsOrigins:
     # The admin SPA's own origin.
@@ -145,7 +160,7 @@ narthex-backend:
     # silently blocked by CORS.
     - "https://prometheus-dev.c2sm-tds.c2sm.cscs.ch"
   # ghcr.io/c2sm/narthex-* packages are private - see deploy/cscs/README
-  # (or the auth-dex secrets convention) for how narthex-ghcr-pull-secret
+  # (or the auth-authelia secrets convention) for how narthex-ghcr-pull-secret
   # is created (kubectl create secret docker-registry, not via Helm).
   imagePullSecrets:
     - name: narthex-ghcr-pull-secret
@@ -159,12 +174,25 @@ narthex-frontend:
   apiUrl: "https://narthex-prometheus-dev.c2sm-tds.c2sm.cscs.ch/api"
   # The SPA is not an OIDC client here: oauth2-proxy's ForwardAuth gate in
   # front of this host (deploy/cscs/narthex-ingress.yaml) authenticates the
-  # user and injects Authorization: Bearer <id_token>, so one login covers
-  # every app on the family. No oidc* values needed in this mode.
+  # user and injects Authorization: Bearer <id_token>, so the SPA sets no
+  # Authorization header of its own. The oidc* values are unused in this mode.
+  #
+  # "oidc" mode - the SPA as its own public Authelia client - was built and
+  # verified here and does authenticate with no extra prompt, but narthex's own
+  # token getter calls signinRedirect() whenever storage holds no user, with no
+  # exemption for its /auth/callback route and no in-flight latch. It therefore
+  # races its own signinRedirectCallback() and navigates away mid-exchange:
+  # 95-262 authorization round-trips and 17-46 seconds before the first load
+  # settles. Switch this back to "oidc" (and register a public `narthex` client
+  # alongside stac-browser) once that is fixed upstream - at which point
+  # oauth2-proxy can be deleted entirely.
   authMode: "proxy"
   # Sign-out belongs to oauth2-proxy, whose /oauth2 endpoints are exposed on
-  # the prometheus-dev host (see auth-dex/oauth2-proxy-ingress.yaml).
-  logoutUrl: "https://prometheus-dev.c2sm-tds.c2sm.cscs.ch/oauth2/sign_out"
+  # this same host (see auth-authelia/oauth2-proxy-ingress.yaml). Note this
+  # ends the oauth2-proxy session only; the shared Authelia session survives,
+  # so the next visit logs straight back in. A full sign-out means visiting
+  # Authelia's own /logout.
+  logoutUrl: "https://narthex-prometheus-dev.c2sm-tds.c2sm.cscs.ch/oauth2/sign_out"
   imagePullSecrets:
     - name: narthex-ghcr-pull-secret
 

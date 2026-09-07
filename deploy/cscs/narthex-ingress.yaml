@@ -1,15 +1,23 @@
-# Dedicated subdomain for narthex, mirroring auth-dex/dex-ingress.yaml's
+# Dedicated subdomain for narthex, mirroring auth-authelia/authelia-ingress.yaml's
 # pattern: own host, own cert-manager-issued TLS cert (HTTP-01, not a
 # shared wildcard - auto-provisioned by the external-dns + cert-manager
 # pair already running in this cluster).
 #
-# Both apps sit behind oauth2-proxy's ForwardAuth gate, which is the single
-# session authority for the whole *.c2sm-tds.c2sm.cscs.ch family (see
-# auth-dex/oauth2-proxy-configmap.yaml's cookie_domains/whitelist_domains).
-# That is what makes one login cover both prometheus-dev.* and
-# narthex-prometheus-dev.*: Dex has no browser SSO session of its own in any
-# released version, so every distinct OIDC client_id would otherwise force a
-# fresh interactive login.
+# This host is the one place still gated by oauth2-proxy rather than by
+# Authelia directly. Authelia's ForwardAuth sets
+# Remote-User/Remote-Groups/Remote-Email/Remote-Name and cannot inject a JWT,
+# while narthex-backend authenticates by validating a bearer token - so
+# something has to put one on the request, and oauth2-proxy's
+# set_authorization_header is that something. See
+# auth-authelia/oauth2-proxy-configmap.yaml for why narthex-frontend is not
+# running as its own OIDC client instead.
+#
+# It is still ONE login for the whole family: oauth2-proxy is an Authelia
+# client (eoapi-narthex), so its login completes silently against the Authelia
+# session the user already has from stac-browser. Under Dex this only worked by
+# scoping oauth2-proxy's own cookie to the parent domain and making it - not the
+# IdP - the session authority, because Dex had no browser session in any
+# released version. That hack is gone: the cookie is now host-scoped.
 #
 # Deliberately split into TWO Ingress resources because Traefik's
 # router.middlewares annotation is per-Ingress, and the two paths need
@@ -29,7 +37,7 @@
 # The stac-browser SaveToNarthex widget calls /api cross-origin with an
 # explicit Bearer token (aud=stac-browser) and no session cookie; that path
 # survives the ForwardAuth gate via oauth2-proxy's skip_jwt_bearer_tokens +
-# oidc_extra_audiences settings.
+# oidc_extra_audiences settings, and narthex-backend accepts that audience too.
 apiVersion: traefik.io/v1alpha1
 kind: Middleware
 metadata:
@@ -40,26 +48,6 @@ spec:
     prefixes:
       - /api
 ---
-# Same as eoapi-dev-oauth-errors, but sends the user back to narthex after
-# login instead of to /browser/ (that one's rd is hardcoded to the STAC
-# browser). Cross-host rd targets are only honoured because
-# whitelist_domains covers this subdomain.
-apiVersion: traefik.io/v1alpha1
-kind: Middleware
-metadata:
-  name: narthex-oauth-errors
-  namespace: eoapi-dev
-spec:
-  errors:
-    status:
-      - "401-403"
-    service:
-      name: eoapi-dev-oauth2-proxy
-      port: 4180
-    query: /oauth2/sign_in?rd=https://narthex-prometheus-dev.c2sm-tds.c2sm.cscs.ch/
-    statusRewrites:
-      "401": 302
----
 # CORS preflights must bypass the ForwardAuth gate. Traefik's ForwardAuth
 # always calls the auth server with GET (the real method only travels in
 # X-Forwarded-Method), so oauth2-proxy never sees an OPTIONS and its own
@@ -68,6 +56,10 @@ spec:
 # cookie by spec, so without this the gate 401s the preflight and the real
 # request is never sent (this is what broke the stac-browser widget's
 # cross-origin calls).
+#
+# Authelia needs no equivalent of this for the hosts it gates: its ForwardAuth
+# implementation reads the real verb out of X-Forwarded-Method, so a plain
+# `methods: ['OPTIONS']` bypass rule in its access_control works.
 #
 # Only cross-origin callers preflight at all: the admin SPA's own calls are
 # same-origin (/api under its own host) and never reach this route. The

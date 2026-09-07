@@ -5,12 +5,12 @@ metadata:
   namespace: eoapi-dev
   labels:
     app.kubernetes.io/name: oauth2-proxy
-    app.kubernetes.io/part-of: eoapi-dev-auth-dex
+    app.kubernetes.io/part-of: eoapi-dev-auth-authelia
 spec:
   type: ClusterIP
   selector:
     app.kubernetes.io/name: oauth2-proxy
-    app.kubernetes.io/part-of: eoapi-dev-auth-dex
+    app.kubernetes.io/part-of: eoapi-dev-auth-authelia
   ports:
     - name: http
       port: 4180

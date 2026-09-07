@@ -1,0 +1,120 @@
+suite: narthex auth mode tests
+templates:
+  - templates/_helpers/core.tpl
+  - templates/_helpers/database.tpl
+  - templates/services/narthex-frontend/deployment.yaml
+  - templates/services/narthex-backend/deployment.yaml
+tests:
+  - it: "narthex frontend renders its own OIDC client config in oidc auth mode"
+    set:
+      narthex-frontend.enabled: true
+      narthex-frontend.authMode: "oidc"
+      narthex-frontend.apiUrl: "https://narthex.example.com/api"
+      narthex-frontend.oidcIssuer: "https://auth.example.com"
+      narthex-frontend.oidcClientId: "narthex"
+      narthex-frontend.oidcRedirectUri: "https://narthex.example.com/auth/callback"
+      narthex-frontend.logoutUrl: "https://auth.example.com/logout"
+    template: templates/services/narthex-frontend/deployment.yaml
+    asserts:
+      - isKind:
+          of: Deployment
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: NARTHEX_AUTH_MODE
+            value: "oidc"
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: NARTHEX_OIDC_ISSUER
+            value: "https://auth.example.com"
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: NARTHEX_OIDC_CLIENT_ID
+            value: "narthex"
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: NARTHEX_OIDC_REDIRECT_URI
+            value: "https://narthex.example.com/auth/callback"
+      # Logout has to end the shared IdP session, not just the SPA's local
+      # state, or "log out" leaves the next login silent.
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: NARTHEX_LOGOUT_URL
+            value: "https://auth.example.com/logout"
+
+  - it: "narthex frontend defaults its OIDC client id"
+    set:
+      narthex-frontend.enabled: true
+      narthex-frontend.authMode: "oidc"
+      narthex-frontend.oidcIssuer: "https://auth.example.com"
+    template: templates/services/narthex-frontend/deployment.yaml
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: NARTHEX_OIDC_CLIENT_ID
+            value: "narthex"
+
+  - it: "narthex backend renders every accepted audience as a JSON array"
+    set:
+      narthex-backend.enabled: true
+      narthex-backend.authMode: "oidc"
+      narthex-backend.oidcIssuer: "https://auth.example.com"
+      narthex-backend.oidcAudiences:
+        - "narthex"
+        - "stac-browser"
+      narthex-backend.launchTokenSecretName: "narthex-secrets"
+      narthex-backend.corsOrigins:
+        - "https://narthex.example.com"
+        - "https://browser.example.com"
+    template: templates/services/narthex-backend/deployment.yaml
+    asserts:
+      - isKind:
+          of: Deployment
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: NARTHEX_AUTH_MODE
+            value: "oidc"
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: NARTHEX_OIDC_ISSUER
+            value: "https://auth.example.com"
+      # More than one audience is load-bearing: the admin SPA calls /api with
+      # its own token (aud narthex) and the stac-browser-embedded
+      # SaveToNarthex widget calls it cross-origin with stac-browser's token
+      # (aud stac-browser).
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: NARTHEX_OIDC_AUDIENCES
+            value: '["narthex","stac-browser"]'
+      # The widget's calling origin is stac-browser's, not narthex's - without
+      # it every widget save is silently blocked by CORS.
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: NARTHEX_CORS_ORIGINS
+            value: '["https://narthex.example.com","https://browser.example.com"]'
+
+  - it: "narthex backend omits OIDC env outside oidc auth mode"
+    set:
+      narthex-backend.enabled: true
+      narthex-backend.authMode: "dev"
+    template: templates/services/narthex-backend/deployment.yaml
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: NARTHEX_AUTH_MODE
+            value: "dev"
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: NARTHEX_OIDC_ISSUER
+            value: "https://auth.example.com"

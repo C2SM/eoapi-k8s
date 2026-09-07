@@ -81,7 +81,8 @@ tests:
                 "openIdConnectUrl": "http://localhost/mock-oidc/.well-known/openid-configuration",
                 "oidcConfig": {
                   "client_id": "test-client",
-                  "redirect_uri": "http://localhost/browser/auth"
+                  "redirect_uri": "http://localhost/browser/auth",
+                  "scope": "openid"
                 }
               }
   - it: "stac browser deployment with custom OIDC_DISCOVERY_URL"
@@ -111,7 +112,8 @@ tests:
                 "openIdConnectUrl": "https://auth.example.com/.well-known/openid-configuration",
                 "oidcConfig": {
                   "client_id": "test-client",
-                  "redirect_uri": "http://localhost/browser/auth"
+                  "redirect_uri": "http://localhost/browser/auth",
+                  "scope": "openid"
                 }
               }
   - it: "stac browser deployment without auth"

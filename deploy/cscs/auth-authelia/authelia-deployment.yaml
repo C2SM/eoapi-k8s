@@ -1,0 +1,100 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: eoapi-dev-authelia
+  namespace: eoapi-dev
+  labels:
+    app.kubernetes.io/name: authelia
+    app.kubernetes.io/part-of: eoapi-dev-auth-authelia
+spec:
+  replicas: 1
+  # SQLite on a ReadWriteOnce PVC: never run two of these at once, and never
+  # let a new pod start before the old one has released the volume.
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: authelia
+      app.kubernetes.io/part-of: eoapi-dev-auth-authelia
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: authelia
+        app.kubernetes.io/part-of: eoapi-dev-auth-authelia
+    spec:
+      securityContext:
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+      containers:
+        - name: authelia
+          image: ghcr.io/authelia/authelia:4.39.22
+          # Two separate list items, not "--config=...". The image's
+          # entrypoint.sh execs $@ verbatim unless $1 is exactly "--config",
+          # so the joined form is treated as a command name and the container
+          # dies with `exec: illegal option --`.
+          args:
+            - --config
+            - /config/configuration.yml
+          ports:
+            - name: http
+              containerPort: 9091
+          env:
+            # Enables the Go-template file filter, which is what inlines the
+            # OIDC signing key PEM into identity_providers.oidc.jwks[0].key
+            # (that option accepts no file path). See authelia-configmap.yaml.
+            - name: X_AUTHELIA_CONFIG_FILTERS
+              value: template
+            # Authelia loads any config key ending in `key`, `secret`,
+            # `password`, `token` or `certificate_chain` from a file when the
+            # env var carries the `_FILE` suffix. Keeps every secret out of
+            # both the ConfigMap and git.
+            - name: AUTHELIA_SESSION_SECRET_FILE
+              value: /secrets/session-secret
+            - name: AUTHELIA_STORAGE_ENCRYPTION_KEY_FILE
+              value: /secrets/storage-encryption-key
+            - name: AUTHELIA_IDENTITY_PROVIDERS_OIDC_HMAC_SECRET_FILE
+              value: /secrets/oidc-hmac-secret
+            - name: AUTHELIA_IDENTITY_VALIDATION_RESET_PASSWORD_JWT_SECRET_FILE
+              value: /secrets/identity-validation-jwt-secret
+          livenessProbe:
+            httpGet:
+              path: /api/health
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 15
+            timeoutSeconds: 3
+          readinessProbe:
+            httpGet:
+              path: /api/health
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 3
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              memory: 256Mi
+          volumeMounts:
+            - name: config
+              mountPath: /config/configuration.yml
+              subPath: configuration.yml
+              readOnly: true
+            - name: secrets
+              mountPath: /secrets
+              readOnly: true
+            - name: data
+              mountPath: /data
+      volumes:
+        - name: config
+          configMap:
+            name: eoapi-dev-authelia-config
+        - name: secrets
+          secret:
+            secretName: authelia-secret
+            defaultMode: 0400
+        - name: data
+          persistentVolumeClaim:
+            claimName: eoapi-dev-authelia-data

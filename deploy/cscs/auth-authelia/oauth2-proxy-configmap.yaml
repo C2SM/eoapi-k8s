@@ -1,0 +1,111 @@
+# oauth2-proxy, retained ONLY as the ForwardAuth gate for the narthex
+# subdomain, and now an Authelia client instead of a Dex one.
+#
+# Why it survived the Dex removal at all: Authelia's ForwardAuth sets
+# Remote-User/Remote-Groups/Remote-Email/Remote-Name and cannot inject a JWT,
+# while narthex-backend authenticates by validating a bearer token. Something
+# has to put one on the request, and `set_authorization_header` below is that
+# something.
+#
+# The alternative - narthex-frontend authMode "oidc", the SPA as its own public
+# client - was built and tested here. It authenticates correctly, but its first
+# load in a new browser session takes 17-46s and fires 95-262 authorization
+# round-trips before settling, because narthex's token getter calls
+# signinRedirect() whenever storage holds no user, with no exemption for the
+# callback route and no in-flight latch, so it races its own
+# signinRedirectCallback(). That is a narthex bug, not a config choice. When it
+# is fixed, this whole deployment can be deleted.
+#
+# Everything else on the family is gated by Authelia directly (see
+# authelia-middleware.yaml) or authenticates itself (/stac via stac-auth-proxy,
+# /browser is public static UI).
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: eoapi-dev-oauth2-proxy-config
+  namespace: eoapi-dev
+  labels:
+    app.kubernetes.io/name: oauth2-proxy
+    app.kubernetes.io/part-of: eoapi-dev-auth-authelia
+data:
+  oauth2-proxy.cfg: |
+    http_address = "0.0.0.0:4180"
+    provider = "oidc"
+    provider_display_name = "Authelia"
+    oidc_issuer_url = "https://auth-prometheus-dev.c2sm-tds.c2sm.cscs.ch"
+    oidc_groups_claim = "groups"
+
+    # Both the callback and the /oauth2 endpoints now live on the narthex host,
+    # the only host this gate protects. Under Dex they were on the eoAPI host
+    # because the gate covered the whole family; keeping them here means the
+    # session cookie needs no cross-subdomain scope at all (see cookie_domains).
+    redirect_url = "https://narthex-prometheus-dev.c2sm-tds.c2sm.cscs.ch/oauth2/callback"
+    proxy_prefix = "/oauth2"
+    skip_provider_button = true
+
+    # Authelia advertises S256 in code_challenge_methods_supported; without
+    # this oauth2-proxy logs "your provider supports PKCE methods but you have
+    # not enabled one" and sends a plain authorization code request.
+    code_challenge_method = "S256"
+
+    # oauth2-proxy defaults approval_prompt to "force", which sends
+    # approval_prompt=force on every authorization request and overrides the
+    # IdP's own skip-consent behaviour - producing a "Grant Access" click on
+    # every single login. "auto" is the legacy Google-compat counterpart of
+    # "force" and stops the parameter being sent at all.
+    #
+    # An empty string does NOT work here: oauth2-proxy treats an empty value as
+    # unset and falls back to its own "force" default. `prompt` is left unset
+    # too - it would supersede this, and none of its valid OIDC values
+    # ("none"/"login"/"consent") mean "default behaviour".
+    approval_prompt = "auto"
+
+    email_domains = ["*"]
+    allowed_groups = ["/eoapi-dev-users"]
+    scope = "openid email profile groups"
+
+    # The SaveToNarthex widget calls /api cross-origin with stac-browser's own
+    # access token, whose aud is "stac-browser" rather than this client's
+    # "eoapi-narthex". Without this the gate rejects those requests with 403
+    # ("audience ... does not match with any of allowed audiences") before
+    # narthex-backend - which accepts both audiences - ever sees them.
+    oidc_extra_audiences = ["stac-browser"]
+
+    # CORS preflights carry no Authorization header and no cookie (browsers
+    # strip credentials from OPTIONS by spec), so ForwardAuth would reject them
+    # and the real request would never be sent, breaking the widget.
+    #
+    # This setting alone is NOT sufficient: Traefik always calls the auth
+    # server with GET and passes the real verb in X-Forwarded-Method, so
+    # oauth2-proxy never sees an OPTIONS and this can never fire. The working
+    # exemption is the router-level Method(`OPTIONS`) IngressRoute in
+    # ../narthex-ingress.yaml. Kept here as defence in depth.
+    skip_auth_preflight = true
+
+    upstreams = ["static://202"]
+    reverse_proxy = true
+    set_xauthrequest = true
+    pass_user_headers = true
+
+    # Lets the widget's explicit Bearer requests through to narthex-backend,
+    # which does its own JWKS validation, instead of being bounced to a login
+    # redirect. Paired with oidc_extra_audiences above.
+    skip_jwt_bearer_tokens = true
+    bearer_token_login_fallback = false
+
+    # The reason this component still exists: narthex-backend needs a bearer
+    # token on the request and Authelia's ForwardAuth cannot supply one.
+    set_authorization_header = true
+
+    cookie_name = "__Secure-eoapi-dev-oauth2"
+    cookie_secure = true
+    cookie_samesite = "lax"
+
+    # Host-scoped, not parent-domain-scoped. Under Dex this cookie had to cover
+    # `.c2sm-tds.c2sm.cscs.ch` because oauth2-proxy - not the IdP - was the
+    # session authority for every app, Dex having no browser session in any
+    # released version. Authelia has a real session now, so this cookie only
+    # needs to cover the single host this gate protects, and a login here
+    # completes silently against the Authelia session the user already has.
+    cookie_domains = ["narthex-prometheus-dev.c2sm-tds.c2sm.cscs.ch"]
+    whitelist_domains = ["narthex-prometheus-dev.c2sm-tds.c2sm.cscs.ch"]
