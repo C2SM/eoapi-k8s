@@ -17,6 +17,18 @@ data:
     proxy_prefix = "/oauth2"
     skip_provider_button = true
 
+    # oauth2-proxy defaults approval_prompt to "force", which sends
+    # approval_prompt=force on every authorization request and overrides
+    # Dex's own oauth2.skipApprovalScreen: true - producing a "Grant Access"
+    # consent click on every single login. "auto" is the legacy Google-compat
+    # counterpart of "force" and stops the parameter being sent at all.
+    #
+    # An empty string does NOT work here: oauth2-proxy treats an empty value
+    # as unset and falls back to its own "force" default. `prompt` is left
+    # unset too - it would supersede this, and none of its valid OIDC values
+    # ("none"/"login"/"consent") mean "default behaviour".
+    approval_prompt = "auto"
+
     email_domains = ["*"]
     allowed_groups = ["/eoapi-dev-users"]
     scope = "openid email profile groups"
