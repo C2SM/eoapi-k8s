@@ -44,7 +44,12 @@ browser:
   # as narthex-backend/narthex-frontend.
   image:
     name: ghcr.io/c2sm/eoapi-browser-narthex
-    tag: "v5.0.0-narthex.1"
+    # Moving pre-release tag, rebuilt whenever the widget changes - so it must
+    # be pullPolicy: Always, exactly like narthex-backend/narthex-frontend
+    # below. IfNotPresent would keep serving whatever layer a node already
+    # cached under this tag string, ignoring new pushes.
+    tag: "v5.0.0-alpha"
+    pullPolicy: Always
   imagePullSecrets:
     - name: narthex-ghcr-pull-secret
   ingress:

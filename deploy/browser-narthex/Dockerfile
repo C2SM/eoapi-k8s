@@ -8,7 +8,11 @@
 # `browser.*` values already drive).
 FROM node:lts-alpine AS build-step
 ARG STAC_BROWSER_REF=v5.0.0
-ARG NARTHEX_REF=v1.0.0-alpha.2
+# narthex publishes a single moving pre-release tag; v1.0.0-alpha.2 no longer
+# exists, so this default has to track whatever tag currently carries the
+# narthex-widget.tar.bz2 release asset. Check before building:
+#   gh release view <ref> --repo C2SM/narthex
+ARG NARTHEX_REF=v1.0.0-alpha
 ARG DYNAMIC_CONFIG=true
 ARG historyMode="history"
 ARG SB_CONFIG=""

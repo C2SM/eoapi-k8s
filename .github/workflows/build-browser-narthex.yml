@@ -10,11 +10,11 @@ on:
       narthex_ref:
         description: "narthex release tag whose narthex-widget.tar.bz2 asset to compile in - must have been built by narthex's release.yml (check the tag's GitHub Release has that asset attached)"
         required: true
-        default: "v1.0.0-alpha.2"
+        default: "v1.0.0-alpha"
       image_tag:
         description: "Tag to publish the built image as"
         required: true
-        default: "v5.0.0-narthex.1"
+        default: "v5.0.0-alpha"
 
 permissions:
   contents: read
