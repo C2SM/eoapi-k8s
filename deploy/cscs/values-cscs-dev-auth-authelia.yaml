@@ -1,24 +1,12 @@
-# Whole-site Authelia ForwardAuth for the CSCS dev deployment. Apply after
+# Attaches Authelia's ForwardAuth gate to the eoAPI ingress. Apply after
 # values-cscs-dev.yaml so this middleware chain replaces the base one.
 #
-# Replaces the deleted values-cscs-dev-auth-dex.yaml, whose chain was
-# ipallowlist -> oauth-errors -> oauth-forwardauth -> strip-prefix. Two changes:
+# References are <namespace>-<name>@kubernetescrd; a wrong name silently drops
+# the whole router instead of failing, so check the rendered annotation with
+# `helm template ... | grep router.middlewares`.
 #
-#   - eoapi-dev-oauth-forwardauth  -> eoapi-dev-authelia-forwardauth
-#   - eoapi-dev-oauth-errors       -> removed entirely
-#
-# The `errors` middleware existed only to turn oauth2-proxy's 401 into a login
-# redirect. Authelia's ForwardAuth issues that redirect itself (verified: 302
-# with a Location back to the portal), so the middleware is not merely
-# unnecessary - dropping it removes a standing hazard, since it rewrote *any*
-# 401/403 from *any* backend on this Ingress into an HTML redirect.
-#
-# oauth2-proxy still gates the narthex subdomain and still needs its own
-# `errors` middleware there; see deploy/cscs/narthex-ingress.yaml.
-#
-# Middleware references are <namespace>-<name>@kubernetescrd. A wrong name here
-# silently drops the whole router instead of failing, so always confirm the
-# rendered string with `helm template ... | grep router.middlewares`.
+# No `errors` middleware: Authelia's ForwardAuth issues the redirect to its own
+# login portal.
 ingress:
   annotations:
     traefik.ingress.kubernetes.io/router.middlewares: "eoapi-dev-eoapi-dev-ipallowlist@kubernetescrd,eoapi-dev-eoapi-dev-authelia-forwardauth@kubernetescrd,eoapi-dev-eoapi-strip-prefix-middleware@kubernetescrd"

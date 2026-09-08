@@ -8,23 +8,12 @@ metadata:
     app.kubernetes.io/part-of: eoapi-dev-auth-authelia
 data:
   configuration.yml: |
-    # Authelia is the OIDC provider (replacing Dex), the shared session
-    # authority, and the ForwardAuth gate for every host except narthex's.
-    # Dex has no server-side browser session in any released version
-    # (dexidp/dex#4560), so every distinct OIDC client_id forced a fresh
-    # credential entry - stac-browser then narthex meant logging in twice.
-    # Authelia keeps a real session, so the second authorization request
-    # completes silently.
+    # Authelia is the OIDC provider, the shared browser session, and the
+    # ForwardAuth gate for the paths with no auth of their own.
     #
-    # oauth2-proxy is still deployed alongside this, gating only the narthex
-    # subdomain, because Authelia's ForwardAuth cannot inject a bearer token
-    # and narthex-backend needs one. See the `eoapi-narthex` client near the
-    # bottom of this file, and README.md's "Why oauth2-proxy is still here".
-    #
-    # Nothing secret lives in this ConfigMap. session.secret,
-    # storage.encryption_key, identity_providers.oidc.hmac_secret, the OIDC
-    # signing key and the users database all arrive from the `authelia-secret`
-    # Secret (see README.md).
+    # No secrets here: session.secret, storage.encryption_key,
+    # identity_providers.oidc.hmac_secret, the OIDC signing key and the users
+    # database all come from the `authelia-secret` Secret. See README.md.
 
     theme: 'auto'
 
@@ -32,28 +21,18 @@ data:
       address: 'tcp://0.0.0.0:9091/'
       endpoints:
         authz:
-          # Redefined rather than left at the default, purely to DROP the
-          # default `HeaderAuthorization` strategy. With it enabled, any
-          # request carrying an Authorization header that Authelia cannot
-          # validate as one of *its own* bearer tokens short-circuits to a
-          # hard 401 - no redirect, no fallback to the session cookie. That
-          # is the exact inverse of oauth2-proxy's skip_jwt_bearer_tokens,
-          # and it would break any gated route that happens to receive a
-          # foreign token (e.g. stac-browser's aud=stac-browser access
-          # token). CookieSession only: the gate is for browser sessions,
-          # bearer tokens are validated by the services that own them
-          # (stac-auth-proxy, narthex-backend).
           forward-auth:
             implementation: 'ForwardAuth'
+            # CookieSession only. The default also enables HeaderAuthorization,
+            # which hard-401s any request carrying a bearer token Authelia
+            # cannot validate as one of its own - no redirect, no fallback to
+            # the session cookie.
             authn_strategies:
               - name: 'CookieSession'
 
     log:
       level: 'info'
-      format: 'text'
 
-    # Parity with the Dex stack: password only, no second factor, no
-    # self-service password reset. `one_factor` everywhere below.
     totp:
       disable: true
     webauthn:
@@ -71,62 +50,31 @@ data:
       password_change:
         disable: true
       file:
-        # Mounted from the `authelia-secret` Secret - it holds argon2 password
-        # hashes, so it is not ConfigMap material.
         path: '/secrets/users-database.yml'
         watch: true
         search:
-          # Dex users authenticated with their email address. The Authelia
-          # file backend keys users by username, so allow either form.
           email: true
         password:
           algorithm: 'argon2'
 
-    # Replaces oauth2-proxy's `skip_auth_routes` + `allowed_groups`.
     access_control:
       default_policy: 'deny'
       rules:
-        # CORS preflights carry no cookie and no Authorization header (browsers
-        # strip credentials from OPTIONS by spec), so they must bypass the gate
-        # or the real request behind them is never sent.
-        #
-        # A rule like this works, unlike oauth2-proxy's own skip_auth_preflight:
-        # Traefik always calls the auth server with GET and puts the real verb
-        # in X-Forwarded-Method, which is precisely where Authelia's ForwardAuth
-        # implementation reads the method from, so no router-level
-        # Method(`OPTIONS`) bypass is needed for the hosts Authelia gates.
-        #
-        # Only prometheus-dev is listed: this whole access_control section
-        # applies solely to requests that reach Authelia's authz endpoint, i.e.
-        # to hosts carrying eoapi-dev-authelia-forwardauth. The narthex host is
-        # gated by oauth2-proxy, so its preflights still need the router-level
-        # IngressRoute in ../narthex-ingress.yaml.
+        # These rules apply only to requests that reach Authelia's authz
+        # endpoint, i.e. hosts carrying the eoapi-dev-authelia-forwardauth
+        # middleware. Only the eoAPI host does.
         - domain: 'prometheus-dev.c2sm-tds.c2sm.cscs.ch'
           policy: 'bypass'
           methods:
             - 'OPTIONS'
-
-        # /stac has its own auth layer (stac-auth-proxy: real JWT validation,
-        # DEFAULT_PUBLIC=true, clean JSON 401s, group-based CQL filtering via
-        # custom_filters.py). Double-gating it turns stac-browser's background
-        # XHR into an opaque "CORS blocked" error, because an HTML 302 to the
-        # login portal gets auto-followed cross-origin.
-        #
-        # /browser is bypassed so an anonymous visitor can reach the STAC
-        # Browser UI and see public collections without logging in - it is
-        # static JS/HTML with nothing sensitive baked in, and actual data
-        # access is governed entirely by stac-auth-proxy's auth:groups
-        # filtering on /stac.
+        # /stac authenticates itself (stac-auth-proxy); /browser is public
+        # static UI. Gating either kills anonymous access to public
+        # collections and turns stac-browser's XHR into opaque CORS errors.
         - domain: 'prometheus-dev.c2sm-tds.c2sm.cscs.ch'
           policy: 'bypass'
           resources:
             - '^/stac(/|$)'
             - '^/browser(/|$)'
-
-        # Everything else on the eoAPI host - /raster, /vector, /multidim and
-        # the / doc server - has no auth layer of its own, so it stays behind
-        # the gate. Slash-prefixed group name matches the Keycloak-style groups
-        # the users database emits.
         - domain: 'prometheus-dev.c2sm-tds.c2sm.cscs.ch'
           policy: 'one_factor'
           subject:
@@ -139,19 +87,12 @@ data:
       expiration: '12h'
       remember_me: '1M'
       cookies:
-        # ONE cookie for the whole *.c2sm-tds.c2sm.cscs.ch family. This is what
-        # makes Authelia the single session authority: the OIDC authorization
-        # endpoint and the ForwardAuth gate consume the same session, so a
-        # login on any app covers every other app and every other client_id.
-        #
-        # authelia_url must be able to read/write cookies for `domain`, i.e. it
-        # has to be that domain or a subdomain of it.
+        # One cookie for the whole family, so one login covers every app and
+        # every client_id. authelia_url must be a subdomain of `domain`.
         - domain: 'c2sm-tds.c2sm.cscs.ch'
           authelia_url: 'https://auth-prometheus-dev.c2sm-tds.c2sm.cscs.ch'
           default_redirection_url: 'https://prometheus-dev.c2sm-tds.c2sm.cscs.ch/browser/'
 
-    # The login portal is deliberately reachable without the IP allowlist (see
-    # authelia-ingress.yaml), so rate-limit it. Dex had nothing equivalent.
     regulation:
       max_retries: 5
       find_time: '2m'
@@ -161,8 +102,6 @@ data:
       local:
         path: '/data/db.sqlite3'
 
-    # Required section, but nothing here sends mail: password reset is
-    # disabled and there is no second factor to enrol.
     notifier:
       disable_startup_check: true
       filesystem:
@@ -170,29 +109,17 @@ data:
 
     identity_providers:
       oidc:
-        # The signing key comes from the Secret, NOT from `storage` above, so
-        # it survives restarts and rescheduling. Dex's `storage: memory`
-        # rotated its signing keys on every restart, which then required
-        # restarting anything caching JWKS (narthex's @lru_cache'd fetch).
-        # That class of bug is gone.
-        #
-        # `key` only accepts the PEM literal, never a path, so the key is
-        # inlined here at startup by Authelia's `template` config file filter
-        # (enabled via X_AUTHELIA_CONFIG_FILTERS in the Deployment). This is
-        # the mechanism the Authelia docs recommend for exactly this option.
-        # It is also why this file must contain no other Go template syntax.
+        # `key` accepts only a PEM literal, never a path, so it is inlined at
+        # startup by Authelia's `template` config filter (X_AUTHELIA_CONFIG_FILTERS
+        # in the Deployment). This file must contain no other Go template syntax.
         jwks:
           - key_id: 'eoapi-dev'
             algorithm: 'RS256'
             use: 'sig'
             key: {{ secret "/secrets/oidc-jwks.pem" | mindent 10 "|" | msquote }}
 
-        # The Authelia equivalent of Dex's `web.allowedOrigins`. Without it,
-        # browsers block stac-browser's and narthex's oidc-client-ts fetches of
-        # the discovery doc and the token endpoint, since
-        # auth-prometheus-dev.* is a different origin than the app hosts.
-        # Deriving the list from each client's registered redirect_uris keeps
-        # it in sync automatically.
+        # Without this, browsers block the SPAs' cross-origin fetches of the
+        # discovery doc and the token endpoint.
         cors:
           endpoints:
             - 'authorization'
@@ -202,10 +129,6 @@ data:
             - 'userinfo'
           allowed_origins_from_client_redirect_uris: true
 
-        # Whole-site authorization, applied at the authorization request itself
-        # rather than only at the ForwardAuth gate. This is stricter than the
-        # Dex setup, where the `stac-browser` client had no group requirement
-        # at all and only oauth2-proxy's allowed_groups gated anything.
         authorization_policies:
           eoapi_users:
             default_policy: 'deny'
@@ -216,15 +139,9 @@ data:
 
         claims_policies:
           eoapi:
-            # Authelia 4.39 mints a deliberately minimal ID Token and serves
-            # non-standard claims from /userinfo instead. Both consumers here
-            # read claims straight off the presented token and never call
-            # /userinfo:
-            #   - custom_filters.py reads context["payload"]["groups"]
-            #   - narthex-backend validates the token and reads its claims
-            # so `groups` has to be copied into the tokens explicitly. It is
-            # needed in the ACCESS token because that is what the browsers
-            # actually send as their Bearer.
+            # 4.39 serves non-standard claims from /userinfo by default. Both
+            # resource servers read claims off the presented token, and the
+            # token the SPAs present is the ACCESS token.
             id_token:
               - 'groups'
               - 'email'
@@ -237,26 +154,14 @@ data:
               - 'preferred_username'
 
         clients:
-          # Both clients are public + PKCE, so there are no client secrets
-          # anywhere in this stack - nothing to hash, rotate or keep out of
-          # git. Three settings on each are load-bearing and non-obvious:
-          #
-          # access_token_signed_response_alg: Authelia access tokens are
-          #   OPAQUE by default. stac-browser sends user.access_token as its
-          #   Bearer (hardcoded in stac-browser src/auth/oidc.js), and both
-          #   stac-auth-proxy and narthex-backend validate that token against
-          #   JWKS. Without RS256 here every protected call fails. Dex hid
-          #   this by making access tokens JWTs unconditionally.
-          #
-          # requested_audience_mode: the aud of a JWT access token is the
-          #   *granted* audience, and Authelia grants none at all unless the
-          #   relying party sends an `audience` parameter - even for a
-          #   whitelisted audience. oidc-client-ts sends no such parameter, so
-          #   without 'implicit' the token's aud is empty and both
-          #   ALLOWED_JWT_AUDIENCES and narthex's oidcAudiences reject it.
-          #
-          # consent_mode: 'implicit' - no "Grant Access" click when hopping
-          #   between apps. The Dex counterpart was oauth2.skipApprovalScreen.
+          # Both public + PKCE, so there are no client secrets anywhere.
+          # Three settings are non-obvious and all are required:
+          #   access_token_signed_response_alg - access tokens are opaque by
+          #     default, and the SPAs send their access token as the bearer
+          #     that stac-auth-proxy / narthex-backend validate.
+          #   requested_audience_mode - Authelia grants no audience unless the
+          #     client asks, and oidc-client-ts never asks.
+          #   consent_mode - no consent click when hopping between apps.
           - client_id: 'stac-browser'
             client_name: 'STAC Browser'
             public: true
@@ -275,48 +180,18 @@ data:
               - 'email'
               - 'groups'
             redirect_uris:
-              # Derived by the chart from ingress.host + browser.ingress.path,
-              # see charts/eoapi/templates/services/browser/deployment.yaml.
               - 'https://prometheus-dev.c2sm-tds.c2sm.cscs.ch/browser/auth'
 
-          # oauth2-proxy, retained ONLY as the ForwardAuth gate for the narthex
-          # subdomain. Authelia's own ForwardAuth cannot inject a JWT upstream
-          # (it sets Remote-User/Remote-Groups/Remote-Email/Remote-Name and
-          # nothing else), and narthex-backend authenticates by validating a
-          # bearer token - so something has to put one on the request.
-          #
-          # The obvious alternative was narthex-frontend authMode "oidc",
-          # making the admin SPA its own public client. That was built and
-          # tested here and it does authenticate, but its first load in any new
-          # browser session takes 17-46 seconds and fires 95-262 authorization
-          # round-trips at Authelia before settling. narthex's own token getter
-          # calls signinRedirect() whenever no user is in storage, with no
-          # "already on the callback route" exemption and no in-flight latch,
-          # so it races its own signinRedirectCallback() and navigates away
-          # mid-exchange, over and over, until the callback handler happens to
-          # win. That is a narthex frontend bug (see its `od()` helper), not
-          # something configurable from here.
-          #
-          # When that is fixed upstream, this client and the whole oauth2-proxy
-          # deployment can go: set narthex-frontend.authMode back to "oidc",
-          # register a public `narthex` client exactly like stac-browser above,
-          # and drop the ForwardAuth gate from ../narthex-ingress.yaml.
-          #
-          # Confidential, because oauth2-proxy requires a client secret.
-          # Authelia stores only a hash of it; the digest is injected by the
-          # same `template` filter that inlines the signing key, so neither the
-          # secret nor its digest is in git. oauth2-proxy gets the plaintext
-          # from its own Secret.
-          - client_id: 'eoapi-narthex'
-            client_name: 'Narthex (via oauth2-proxy)'
-            client_secret: {{ secret "/secrets/oauth2-proxy-client-secret-digest" }}
+          - client_id: 'narthex'
+            client_name: 'Narthex'
+            public: true
+            require_pkce: true
+            pkce_challenge_method: 'S256'
             authorization_policy: 'eoapi_users'
             consent_mode: 'implicit'
-            # oauth2-proxy reads group membership from the ID token, which is
-            # exactly what this policy's id_token list provides.
             claims_policy: 'eoapi'
             audience:
-              - 'eoapi-narthex'
+              - 'narthex'
             requested_audience_mode: 'implicit'
             access_token_signed_response_alg: 'RS256'
             scopes:
@@ -325,4 +200,4 @@ data:
               - 'email'
               - 'groups'
             redirect_uris:
-              - 'https://narthex-prometheus-dev.c2sm-tds.c2sm.cscs.ch/oauth2/callback'
+              - 'https://narthex-prometheus-dev.c2sm-tds.c2sm.cscs.ch/auth/callback'

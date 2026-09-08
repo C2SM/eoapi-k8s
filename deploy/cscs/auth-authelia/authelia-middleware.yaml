@@ -1,29 +1,13 @@
-# The ForwardAuth gate, replacing eoapi-dev-oauth-forwardauth.
+# ForwardAuth for the eoAPI host. Protects only what has no auth of its own:
+# /raster, /vector, /multidim and the / doc server. /stac and /browser are
+# `bypass` rules in Authelia's access_control; narthex is not on this host.
 #
-# It protects only what has no auth layer of its own: /raster, /vector,
-# /multidim and the / doc server. /stac (stac-auth-proxy), /browser (public
-# static UI) and the whole narthex subdomain (its own OIDC client +
-# narthex-backend's own JWKS validation) are exempted - the first two via
-# `bypass` rules in Authelia's access_control, narthex by simply not carrying
-# this middleware (see ../narthex-ingress.yaml).
+# trustForwardHeader is required: Traefik calls the auth server with GET and
+# puts the real method, host and path in X-Forwarded-*, which is where
+# Authelia reads them from - and it is what makes the OPTIONS bypass rule work.
 #
-# NOTE there is no companion `errors` middleware any more. oauth2-proxy needed
-# one to turn its 401 into a login redirect, and that middleware rewrote *any*
-# 401/403 from *any* backend into an HTML redirect - which is why it had to be
-# kept away from every API path. Authelia's ForwardAuth implementation issues
-# the redirect to the login portal itself (built from the session cookie's
-# `authelia_url`), so the whole hazard is gone.
-#
-# trustForwardHeader is required: Traefik always calls the auth server with
-# GET and passes the real request's method, host and path in
-# X-Forwarded-Method / X-Forwarded-Host / X-Forwarded-URI, which is where
-# Authelia's ForwardAuth implementation reads them from. It is also what makes
-# the access_control `methods: ['OPTIONS']` preflight bypass work at all.
-#
-# Referenced from an Ingress as `eoapi-dev-eoapi-dev-authelia-forwardauth@kubernetescrd`
-# (i.e. <namespace>-<name>@kubernetescrd). A typo there silently drops the
-# entire router rather than erroring, and requests fall through to some other
-# route - always verify the rendered annotation string.
+# There is deliberately no companion `errors` middleware: Authelia's
+# ForwardAuth returns the 302 to its login portal itself.
 apiVersion: traefik.io/v1alpha1
 kind: Middleware
 metadata:
@@ -37,15 +21,10 @@ spec:
     address: http://eoapi-dev-authelia.eoapi-dev.svc.cluster.local:9091/api/authz/forward-auth
     trustForwardHeader: true
     maxResponseBodySize: 8192
+    # Authelia's identity headers. Nothing consumes them today - the gate is
+    # whole-site authorization only - and there is no Authorization here
+    # because Authelia's ForwardAuth does not mint or inject a JWT.
     authResponseHeaders:
-      # Authelia's upstream identity headers. Nothing in eoAPI consumes these
-      # today (the gate is whole-site authorization only, exactly as with
-      # oauth2-proxy's X-Auth-Request-* headers), but they are forwarded so a
-      # backend can start using them without touching Traefik.
-      #
-      # There is deliberately no `Authorization` here: Authelia's ForwardAuth
-      # does not mint or inject a JWT. Services that need a token get it from
-      # the browser directly (stac-browser and narthex are both OIDC clients).
       - Remote-User
       - Remote-Groups
       - Remote-Email

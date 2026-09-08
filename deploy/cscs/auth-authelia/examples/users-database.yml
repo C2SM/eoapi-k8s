@@ -1,25 +1,11 @@
-# Documentation only - the real file carries argon2 password hashes and is
-# supplied through the `authelia-secret` Secret (key `users-database.yml`),
-# never committed. See ../README.md for how to generate the hashes.
+# Documentation only - the real file carries argon2 hashes and is supplied via
+# the `authelia-secret` Secret (key `users-database.yml`), never committed.
 #
-# This is the Authelia equivalent of Dex's `staticPasswords`. Two things carry
-# over deliberately:
+# Groups MUST keep the leading slash: custom_filters.py maps '/eoapi-noaa' ->
+# noaa etc., and dropping it silently reduces every user to public collections.
+# Every user needs '/eoapi-dev-users', the whole-site gate.
 #
-#  1. The GROUPS KEEP THEIR LEADING SLASH. Authelia treats group names as
-#     arbitrary strings, so the Keycloak-style form survives untouched. That is
-#     what lets charts/eoapi/data/stac-auth-proxy/custom_filters.py stay
-#     byte-identical: it maps '/eoapi-noaa' -> noaa, '/nasa-users' -> nasa,
-#     '/dyamond-users' -> dyamond, and bypasses filtering for '/eoapi-admin'.
-#     Dropping the slash would silently strip every user's dataset access down
-#     to the public collections.
-#
-#  2. Every user is in '/eoapi-dev-users'. That group is the whole-site
-#     authorization gate, enforced both by Authelia's access_control rules and
-#     by the `eoapi_users` authorization_policy on each OIDC client.
-#
-# The map key is the username. `authentication_backend.file.search.email: true`
-# is enabled, so users can sign in with either the username or the email
-# address (Dex users signed in with their email).
+# The map key is the username; email login also works.
 users:
   kservis:
     disabled: false

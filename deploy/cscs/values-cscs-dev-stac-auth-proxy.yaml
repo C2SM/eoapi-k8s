@@ -13,21 +13,10 @@ stac-auth-proxy:
         UPSTREAM_URL: "http://eoapi-stac:8080"
         OIDC_DISCOVERY_URL: "https://auth-prometheus-dev.c2sm-tds.c2sm.cscs.ch/.well-known/openid-configuration"
         OIDC_DISCOVERY_INTERNAL_URL: "https://auth-prometheus-dev.c2sm-tds.c2sm.cscs.ch/.well-known/openid-configuration"
-        # Only one audience reaches /stac: stac-browser's own access token, from
-        # its in-app OIDC login (client `stac-browser` in
-        # deploy/cscs/auth-authelia/authelia-configmap.yaml). Under Dex this
-        # also had to list oauth2-proxy's client, because that gate covered the
-        # whole eoAPI host and injected its id_token into /stac requests too.
-        # Nothing injects a header here now - Authelia's ForwardAuth does not,
-        # and /stac is `bypass` in its access_control anyway - so this is the
-        # complete list.
-        #
-        # This is an ACCESS token audience. Authelia mints opaque access tokens
-        # by default and grants no audience at all unless the client asks, so
-        # the client sets `access_token_signed_response_alg: RS256` plus
-        # `requested_audience_mode: implicit` to get a JWT whose aud is its own
-        # client_id. This check is entirely independent of narthex-backend's own
-        # oidcAudiences list.
+        # Only stac-browser's own access token reaches /stac; nothing injects
+        # an Authorization header here. This is an ACCESS token audience, which
+        # requires the client's access_token_signed_response_alg +
+        # requested_audience_mode settings in authelia-configmap.yaml.
         ALLOWED_JWT_AUDIENCES: "stac-browser"
         ROOT_PATH: "/stac"
         ROOT_PATH_SKIP_PREFIXES: "/raster,/vector,/browser,/multidim"

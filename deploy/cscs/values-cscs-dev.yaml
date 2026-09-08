@@ -70,12 +70,9 @@ browser:
   # Must be externally accessible; feeds the SB_authConfig openIdConnectUrl
   # the chart generates for stac-browser's oidc-client-ts-based OIDC login.
   oidcDiscoveryUrl: "https://auth-prometheus-dev.c2sm-tds.c2sm.cscs.ch/.well-known/openid-configuration"
-  # The "groups" scope is what gets group membership into the token at all.
-  # Authelia additionally needs a claims policy to copy `groups` out of
-  # /userinfo and into the tokens themselves (see auth-authelia's
-  # claims_policies.eoapi) - without both halves, stac-auth-proxy's
-  # custom_filters.py sees no groups and every user is reduced to the public
-  # collections.
+  # The "groups" scope gets group membership into the token; Authelia also
+  # needs claims_policies.eoapi to copy it out of /userinfo. Both halves are
+  # required or custom_filters.py sees no groups.
   oidcScope: "openid email profile groups"
   catalogImage: "https://ethz.ch/content/dam/ethz/special-interest/usys/c2sm-dam/center/logos/logo_xlarge.gif"
   footerLinks:
@@ -112,61 +109,32 @@ browser:
     // `${adminUrl}/named-lists/${id}` - a trailing slash here produces "//".
     window.STAC_BROWSER_CONFIG.narthexAdminUrl = "https://narthex-prometheus-dev.c2sm-tds.c2sm.cscs.ch";
 
-# narthex-backend/narthex-frontend live on their own dedicated subdomain
-# (narthex-prometheus-dev.*, mirroring auth-prometheus-dev.*) via
-# deploy/cscs/narthex-ingress.yaml, not the shared chart Ingress - both
-# ingress.enabled: false below.
+# narthex lives on its own subdomain (deploy/cscs/narthex-ingress.yaml), not
+# the shared chart Ingress - both ingress.enabled: false below.
 #
-# This host is the one place still behind oauth2-proxy's ForwardAuth gate
-# rather than Authelia's. Authelia's ForwardAuth cannot inject a JWT (it only
-# sets Remote-User/Remote-Groups/Remote-Email/Remote-Name) and this backend
-# authenticates by validating a bearer token, so oauth2-proxy stays purely for
-# its `set_authorization_header`. See
-# deploy/cscs/auth-authelia/oauth2-proxy-configmap.yaml for why the obvious
-# alternative - narthex-frontend authMode "oidc", the SPA as its own OIDC
-# client - is not in use: it works, but narthex's own first-load redirect race
-# makes it take 17-46 seconds.
-#
-# It is still ONE login for the whole family: oauth2-proxy is an Authelia
-# client, so its login completes silently against the Authelia session the user
-# already has. Under Dex this needed oauth2-proxy's cookie scoped to the parent
-# domain, making it rather than the IdP the session authority, because Dex had
-# no browser session in any released version.
+# The SPA is its own Authelia OIDC client and the backend validates bearer
+# tokens itself, same as /browser + /stac. One login still covers every app
+# because Authelia holds a real shared session, so the SPA's authorization
+# request completes silently.
 narthex-backend:
   enabled: true
-  # v1.0.0-alpha is a mutable tag getting force-moved during active
-  # narthex development - IfNotPresent would keep serving whatever image
-  # a node already cached under that tag string, ignoring new pushes.
+  # Moving pre-release tag: IfNotPresent would serve a node's cached layer.
   image:
     pullPolicy: Always
   ingress:
     enabled: false
   authMode: "oidc"
   oidcIssuer: "https://auth-prometheus-dev.c2sm-tds.c2sm.cscs.ch"
-  # Both are Authelia clients. The tokens reaching this backend are JWTs whose
-  # aud is the issuing client_id, which for the widget's access token needs
-  # Authelia's `access_token_signed_response_alg: RS256` (its access tokens are
-  # opaque by default) and `requested_audience_mode: implicit` (it grants no
-  # audience at all unless the client asks, and oidc-client-ts never asks).
+  # narthex = the admin SPA's own client; stac-browser = the SaveToNarthex
+  # widget, which calls this API cross-origin with stac-browser's token.
   oidcAudiences:
-    # oauth2-proxy's client: the id_token it injects for any request that
-    # passes its ForwardAuth gate, i.e. the admin SPA's own API calls.
-    - "eoapi-narthex"
-    # Widget-embedded save calls arrive with stac-browser's own access token
-    # (aud=stac-browser) instead: that path is cross-origin and carries an
-    # explicit Bearer header set by the widget.
+    - "narthex"
     - "stac-browser"
   corsOrigins:
-    # The admin SPA's own origin.
     - "https://narthex-prometheus-dev.c2sm-tds.c2sm.cscs.ch"
-    # The SaveToNarthex widget's *actual* calling origin - it runs embedded
-    # inside stac-browser, so its fetch() calls come from prometheus-dev.*,
-    # not narthex-prometheus-dev.*. Without this, the widget's saves are
-    # silently blocked by CORS.
+    # The widget runs embedded in stac-browser, so its fetches come from
+    # prometheus-dev.*, not narthex-prometheus-dev.*.
     - "https://prometheus-dev.c2sm-tds.c2sm.cscs.ch"
-  # ghcr.io/c2sm/narthex-* packages are private - see deploy/cscs/README
-  # (or the auth-authelia secrets convention) for how narthex-ghcr-pull-secret
-  # is created (kubectl create secret docker-registry, not via Helm).
   imagePullSecrets:
     - name: narthex-ghcr-pull-secret
 
@@ -177,27 +145,15 @@ narthex-frontend:
   ingress:
     enabled: false
   apiUrl: "https://narthex-prometheus-dev.c2sm-tds.c2sm.cscs.ch/api"
-  # The SPA is not an OIDC client here: oauth2-proxy's ForwardAuth gate in
-  # front of this host (deploy/cscs/narthex-ingress.yaml) authenticates the
-  # user and injects Authorization: Bearer <id_token>, so the SPA sets no
-  # Authorization header of its own. The oidc* values are unused in this mode.
-  #
-  # "oidc" mode - the SPA as its own public Authelia client - was built and
-  # verified here and does authenticate with no extra prompt, but narthex's own
-  # token getter calls signinRedirect() whenever storage holds no user, with no
-  # exemption for its /auth/callback route and no in-flight latch. It therefore
-  # races its own signinRedirectCallback() and navigates away mid-exchange:
-  # 95-262 authorization round-trips and 17-46 seconds before the first load
-  # settles. Switch this back to "oidc" (and register a public `narthex` client
-  # alongside stac-browser) once that is fixed upstream - at which point
-  # oauth2-proxy can be deleted entirely.
-  authMode: "proxy"
-  # Sign-out belongs to oauth2-proxy, whose /oauth2 endpoints are exposed on
-  # this same host (see auth-authelia/oauth2-proxy-ingress.yaml). Note this
-  # ends the oauth2-proxy session only; the shared Authelia session survives,
-  # so the next visit logs straight back in. A full sign-out means visiting
-  # Authelia's own /logout.
-  logoutUrl: "https://narthex-prometheus-dev.c2sm-tds.c2sm.cscs.ch/oauth2/sign_out"
+  authMode: "oidc"
+  oidcIssuer: "https://auth-prometheus-dev.c2sm-tds.c2sm.cscs.ch"
+  oidcClientId: "narthex"
+  # Must match a redirect_uri on the `narthex` client in
+  # deploy/cscs/auth-authelia/authelia-configmap.yaml.
+  oidcRedirectUri: "https://narthex-prometheus-dev.c2sm-tds.c2sm.cscs.ch/auth/callback"
+  # Ends the shared Authelia session - the only thing that really logs a user
+  # out of every app.
+  logoutUrl: "https://auth-prometheus-dev.c2sm-tds.c2sm.cscs.ch/logout"
   imagePullSecrets:
     - name: narthex-ghcr-pull-secret
 
