@@ -129,6 +129,29 @@ data:
             - 'userinfo'
           allowed_origins_from_client_redirect_uris: true
 
+        lifespans:
+          # Scoped to the notebook client (lifespan: 'notebook' below) so the
+          # SPAs keep the 1h default.
+          custom:
+            notebook:
+              # Long, because it is the ONLY lever on how often a notebook
+              # user logs in again. Authelia grants offline_access (and so a
+              # refresh token) only in the authorization code or hybrid flow
+              # - never the device grant - so there is nothing to renew with,
+              # and narthex_client caches this token on disk and re-runs the
+              # device flow when it expires.
+              #
+              # The cost is revocation lag: stac-auth-proxy validates the JWT
+              # against the JWKS rather than introspecting, so a group change
+              # or a disabled account does not take effect for a presented
+              # token until it expires. Acceptable here (the data is public
+              # and the risk model is inconvenience); shorten it if that ever
+              # stops being true.
+              access_token: '7d'
+              # Leave short: this is the window in which an unapproved device
+              # code can still be redeemed.
+              device_code: '10m'
+
         authorization_policies:
           eoapi_users:
             default_policy: 'deny'
@@ -201,3 +224,60 @@ data:
               - 'groups'
             redirect_uris:
               - 'https://narthex-prometheus-dev.c2sm-tds.c2sm.cscs.ch/auth/callback'
+
+          # narthex_client (github.com/C2SM/narthex, client/), the Python
+          # library a launched notebook uses to re-query the origin STAC API
+          # for the items a named list references. It runs on
+          # jupyter-santis.cscs.ch, which authenticates against CSCS SSO - a
+          # different IdP, no shared session here, and no redirect back into a
+          # notebook kernel - so the device authorization grant (RFC 8628) is
+          # the only workable flow. Without a token the notebook is not
+          # refused but silently served the anonymous catalog
+          # (DEFAULT_PUBLIC=true + custom_filters.py), and a restricted
+          # collection 404s as if deleted.
+          - client_id: 'narthex-python-client'
+            client_name: 'Narthex Python client'
+            # A notebook on a shared filesystem can keep no secret: RFC 8252
+            # public client. No require_pkce, unlike the two SPAs above - PKCE
+            # binds an authorization request to its code exchange, and the
+            # device grant issues no authorization request to bind.
+            public: true
+            authorization_policy: 'eoapi_users'
+            # Deliberately NOT 'implicit' like the SPAs: in a device flow the
+            # consent screen is the only thing that tells the user which
+            # application they are approving, which is the defence against
+            # device-code phishing.
+            consent_mode: 'explicit'
+            # Puts `groups` in the ACCESS token, which is the claim
+            # stac-auth-proxy's filters authorize against. Without it the
+            # token buys exactly the anonymous view.
+            claims_policy: 'eoapi'
+            # Authelia access tokens are opaque by default; both resource
+            # servers validate a JWT against the JWKS.
+            access_token_signed_response_alg: 'RS256'
+            # 'stac-browser' is the one audience both resource servers already
+            # accept - stac-auth-proxy's ALLOWED_JWT_AUDIENCES and
+            # narthex-backend's oidcAudiences - so reusing it lets one
+            # notebook token reach both with no edit on either side. The
+            # second value grants nothing further: it only makes notebook
+            # tokens identifiable in logs and leaves a hook should these ever
+            # need filtering apart from browser tokens.
+            audience:
+              - 'stac-browser'
+              - 'narthex-python-client'
+            requested_audience_mode: 'implicit'
+            # Device grant only. No refresh_token grant and no offline_access
+            # scope deliberately: Authelia issues refresh tokens only for the
+            # authorization code and hybrid flows, so both would be inert
+            # here, and its validator warns that offline_access without a
+            # code-bearing response type becomes an error in a later version.
+            # Longevity comes from the 'notebook' access token lifespan above.
+            grant_types:
+              - 'urn:ietf:params:oauth:grant-type:device_code'
+            scopes:
+              - 'openid'
+              - 'profile'
+              - 'email'
+              - 'groups'
+            lifespan: 'notebook'
+            # No redirect_uris: the device flow has no redirect.

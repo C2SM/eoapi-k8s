@@ -56,9 +56,10 @@ Either username or email works at the prompt. See
 |---|---|---|
 | `stac-browser` | stac-browser's login; also the widget's token source | `https://prometheus-dev.c2sm-tds.c2sm.cscs.ch/browser/auth` |
 | `narthex` | the narthex admin SPA | `https://narthex-prometheus-dev.c2sm-tds.c2sm.cscs.ch/auth/callback` |
+| `narthex-python-client` | `narthex_client` in a launched notebook, reading non-public collections off `/stac` | none — device flow |
 
-Both public + PKCE, so no client secrets exist anywhere. Audience wiring must
-stay in sync across three files:
+The first two are public + PKCE, so no client secrets exist anywhere. Audience
+wiring must stay in sync across three files:
 
 ```text
 authelia-configmap.yaml               audience: ['stac-browser'] / ['narthex']
@@ -68,6 +69,45 @@ values-cscs-dev.yaml                  narthex-backend.oidcAudiences: [narthex, s
 
 `ALLOWED_JWT_AUDIENCES` lists only `stac-browser` because nothing injects an
 `Authorization` header onto `/stac`.
+
+### narthex-python-client (device flow)
+
+A launched notebook re-queries the origin STAC API to resolve what a named list
+references. Anonymously that silently returns the filtered catalog — a
+restricted collection 404s as if deleted — so it has to present a token. The
+notebook runs on `jupyter-santis.cscs.ch` against CSCS SSO, a different IdP
+with no session here and nowhere to redirect a kernel, so the only workable
+grant is the device authorization grant (RFC 8628).
+
+It reuses the `stac-browser` audience, the one value both stac-auth-proxy and
+narthex-backend already accept, so one notebook token reaches both without
+touching either config; the extra `narthex-python-client` audience only makes
+these tokens identifiable in logs. `consent_mode` is `explicit`, unlike the
+SPAs — in a device flow the consent screen is the only thing naming the app the
+user is approving, and the defence against device-code phishing.
+
+Access tokens live 7 days (`lifespans.custom.notebook`) because that is the
+only lever on re-login frequency: Authelia grants `offline_access`, and so
+refresh tokens, only in the authorization code and hybrid flows, never the
+device grant. The cost is that a presented token cannot be revoked before it
+expires — stac-auth-proxy validates it against the JWKS rather than
+introspecting — so group changes lag by up to a week.
+
+Drive the flow by hand, no notebook needed:
+
+```bash
+AUTH=https://auth-prometheus-dev.c2sm-tds.c2sm.cscs.ch
+curl -s -X POST $AUTH/api/oidc/device-authorization \
+  -d 'client_id=narthex-python-client' -d 'scope=openid profile email groups'
+# open verification_uri, enter user_code, approve, then:
+curl -s -X POST $AUTH/api/oidc/token \
+  -d 'grant_type=urn:ietf:params:oauth:grant-type:device_code' \
+  -d "device_code=$DEVICE_CODE" -d 'client_id=narthex-python-client'
+```
+
+The access token must be a JWT (not opaque), `alg` RS256, `aud` containing
+`stac-browser`, and carry `groups` — all four or stac-auth-proxy hands back the
+anonymous view.
 
 ## Secrets
 

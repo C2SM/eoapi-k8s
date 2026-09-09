@@ -5,7 +5,9 @@ metadata:
   name: {{ .Release.Name }}-doc-server-html
 data:
   index.html: |
-    {{- if .Values.docServer.redirectTo }}
+    {{- if .Values.docServer.customHtml }}
+    {{- .Values.docServer.customHtml | nindent 4 }}
+    {{- else if .Values.docServer.redirectTo }}
     <html>
     <head>
         <meta http-equiv="refresh" content="0; url={{ .Values.docServer.redirectTo }}" />

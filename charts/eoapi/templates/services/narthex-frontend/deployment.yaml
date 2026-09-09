@@ -16,6 +16,8 @@ spec:
       app: {{ .Release.Name }}-narthex-frontend
   template:
     metadata:
+      annotations:
+        checksum/launch-configs: {{ include (print $.Template.BasePath "/services/narthex-frontend/configmap.yaml") . | sha256sum }}
       labels:
         {{- include "eoapi.selectorLabels" . | nindent 8 }}
         app.kubernetes.io/component: narthex-frontend
@@ -28,6 +30,10 @@ spec:
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
       {{- end }}
+      volumes:
+        - name: launch-configs
+          configMap:
+            name: {{ .Release.Name }}-narthex-launch-configs
       containers:
         - name: narthex-frontend
           image: {{ include "eoapi.containerImage" $nf.image }}
@@ -47,8 +53,13 @@ spec:
               value: {{ $nf.oidcClientId | default "narthex" | quote }}
             - name: NARTHEX_OIDC_REDIRECT_URI
               value: {{ $nf.oidcRedirectUri | quote }}
-            - name: NARTHEX_LAUNCH_CONFIGS_JSON
-              value: {{ $nf.launchConfigs | default list | toJson | quote }}
+            - name: NARTHEX_LAUNCH_CONFIGS_FILE
+              value: /etc/narthex/launch-configs.yaml
+          volumeMounts:
+            - name: launch-configs
+              mountPath: /etc/narthex/launch-configs.yaml
+              subPath: launch-configs.yaml
+              readOnly: true
           resources:
             {{- toYaml $nf.settings.resources | nindent 12 }}
       serviceAccountName: {{ include "eoapi.serviceAccountName" . }}

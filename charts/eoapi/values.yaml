@@ -793,11 +793,13 @@ narthex-frontend:
   # provider, e.g. "https://<host>/narthex/auth/callback".
   oidcRedirectUri: ""
   # JupyterHub/notebook launch targets (narthex's "Launch in JupyterHub"
-  # button) - passed through as NARTHEX_LAUNCH_CONFIGS_JSON (narthex
-  # frontend/src/launchConfigs.ts, as of narthex v1.0.0-alpha.2). Empty by
-  # default: an unset/empty list here means no Hub targets are offered, not
-  # a fallback to narthex's own dev-only defaults (those only apply to an
-  # unbuilt local `npm run dev` checkout, never a deployed image).
+  # button) - rendered as a YAML ConfigMap mounted into the pod and read via
+  # NARTHEX_LAUNCH_CONFIGS_FILE (narthex frontend/src/launchConfigs.ts,
+  # docker-entrypoint.d/40-generate-runtime-config.sh converts it to JSON at
+  # container startup). Empty by default: an unset/empty list here means no
+  # Hub targets are offered, not a fallback to narthex's own dev-only
+  # defaults (those only apply to an unbuilt local `npm run dev` checkout,
+  # never a deployed image).
   # Each entry is a JupyterHubLaunchConfig, e.g.:
   #   - id: "santis"
   #     label: "Santis"
@@ -815,6 +817,13 @@ narthex-frontend:
 docServer:
   enabled: true
   redirectTo: ""  # When set, root path redirects here instead of showing the landing page (e.g. "/browser/")
+  # Replaces the root page wholesale, for a deployment that wants its own
+  # branding or a delayed rather than instant redirect (redirectTo emits a
+  # bare `content="0; url=..."` with no markup of its own). Takes precedence
+  # over redirectTo. Served as-is by nginx, so it must be a complete document
+  # and self-contained - there is nothing else in the doc-server's webroot to
+  # reference, so inline any CSS and use a data URI for images.
+  customHtml: ""
   image:
     name: nginxinc/nginx-unprivileged
     tag: "1.27.4-alpine"
