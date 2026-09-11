@@ -163,7 +163,7 @@ narthex-frontend:
       jupyterHubUrl: https://jupyter-santis.cscs.ch
       notebookApp: narthex-launch
       uenv: eobs-lab     # name part must match `uenv status` output
-      venv: ~/.venvs/narthex-eobs-lab
+      venv: /user-environment/venv
       notebook: named-list-viewer
       # Shown in an acknowledgement modal before the launch proceeds. Neither
       # choice below can be made for the user from here - the uenv and the
