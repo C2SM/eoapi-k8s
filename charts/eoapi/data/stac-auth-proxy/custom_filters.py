@@ -1,4 +1,9 @@
-"""Custom collection and item filters for STAC Auth Proxy."""
+"""Authorization filters for STAC Auth Proxy.
+
+Access is granted per collection, by the `auth:groups` list on the collection
+itself. Items carry none of their own: an item is readable exactly when its
+parent collection is.
+"""
 
 import asyncio
 import dataclasses
@@ -6,157 +11,111 @@ import json
 import os
 import time
 from typing import Any
-from urllib.parse import urljoin
+from urllib.error import HTTPError
+from urllib.parse import quote, urlencode
 from urllib.request import Request, urlopen
 
-
 ADMIN_GROUP = "/eoapi-admin"
+# auth:groups value that grants everyone, authenticated or not.
+PUBLIC = "public"
+GROUPS = {"/eoapi-noaa": "noaa", "/nasa-users": "nasa", "/dyamond-users": "dyamond"}
+CACHE_TTL = 60
+PAGE = 1000
+UPSTREAM = os.environ.get("UPSTREAM_URL", "").rstrip("/")
 
-# Collections tagged with this value in their own auth:groups metadata are
-# visible to everyone, authenticated or not - mark a collection public by
-# adding "public" to its auth:groups list.
-PUBLIC_AUTH_VALUE = "public"
-
-GROUP_AUTH_VALUES = {
-    "/eoapi-noaa": "noaa",
-    "/nasa-users": "nasa",
-    "/dyamond-users": "dyamond",
-}
-
-COLLECTION_CACHE_TTL_SECONDS = 60
-UPSTREAM_URL = os.environ.get("UPSTREAM_URL", "").rstrip("/")
-_collection_cache: dict[tuple[str, ...], tuple[float, list[str]]] = {}
+# Upstream responses by path. Not keyed by caller: a collection's auth:groups
+# belongs to the collection, so every caller shares one entry.
+_cache: dict[str, tuple[float, Any]] = {}
 
 
-def _groups(context: dict[str, Any]) -> set[str]:
-    groups = (context.get("payload") or {}).get("groups", [])
-
+def _readable(context: dict[str, Any]) -> list[str] | None:
+    """auth:groups values this caller may read. None means unrestricted."""
+    groups = (context.get("payload") or {}).get("groups") or []
     if isinstance(groups, str):
         groups = groups.replace(",", " ").split()
-
-    return {group for group in groups if isinstance(group, str)}
-
-
-def _authorized_auth_values(groups: set[str]) -> list[str]:
-    values = [
-        auth_value
-        for group, auth_value in GROUP_AUTH_VALUES.items()
-        if group in groups
-    ]
-    values.append(PUBLIC_AUTH_VALUE)
-    return values
-
-
-def _auth_groups_filter(context: dict[str, Any]) -> str | dict[str, Any]:
-    groups = _groups(context)
-
     if ADMIN_GROUP in groups:
-        return "1=1"
-
-    auth_values = _authorized_auth_values(groups)
-
-    if len(auth_values) == 1:
-        return {
-            "op": "a_contains",
-            "args": [{"property": "auth:groups"}, auth_values],
-        }
-
-    return {
-        "op": "a_overlaps",
-        "args": [{"property": "auth:groups"}, auth_values],
-    }
+        return None
+    return [value for group, value in GROUPS.items() if group in groups] + [PUBLIC]
 
 
-def _collection_auth_groups(collection: dict[str, Any]) -> set[str]:
-    auth_groups = collection.get("auth:groups", [])
-
-    if isinstance(auth_groups, str):
-        auth_groups = auth_groups.replace(",", " ").split()
-
-    return {auth_group for auth_group in auth_groups if isinstance(auth_group, str)}
+def _expr(values: list[str]) -> dict[str, Any]:
+    """CQL2 matching collections that share one of `values`."""
+    op = "a_contains" if len(values) == 1 else "a_overlaps"
+    return {"op": op, "args": [{"property": "auth:groups"}, values]}
 
 
-def _collection_ids_filter(collection_ids: list[str]) -> str | dict[str, Any]:
-    if not collection_ids:
-        return "1=0"
+def _get(path: str) -> Any:
+    """Upstream JSON, briefly cached. A missing collection reads as {}."""
+    hit = _cache.get(path)
+    if hit and time.monotonic() - hit[0] < CACHE_TTL:
+        return hit[1]
 
-    if len(collection_ids) == 1:
-        return {
-            "op": "=",
-            "args": [{"property": "collection"}, collection_ids[0]],
-        }
-
-    return {
-        "op": "in",
-        "args": [{"property": "collection"}, collection_ids],
-    }
-
-
-def _next_href(payload: dict[str, Any], current_url: str) -> str | None:
-    for link in payload.get("links", []):
-        if link.get("rel") == "next" and link.get("href"):
-            return urljoin(current_url, link["href"])
-
-    return None
-
-
-def _load_allowed_collection_ids(auth_values: tuple[str, ...]) -> list[str]:
-    now = time.monotonic()
-    cached = _collection_cache.get(auth_values)
-
-    if cached and now - cached[0] < COLLECTION_CACHE_TTL_SECONDS:
-        return cached[1]
-
-    if not UPSTREAM_URL:
-        return []
-
-    auth_value_set = set(auth_values)
-    collection_ids: list[str] = []
-    url = f"{UPSTREAM_URL}/collections"
-
-    while url:
-        request = Request(url, headers={"Accept": "application/json"})
-
+    request = Request(f"{UPSTREAM}{path}", headers={"Accept": "application/json"})
+    try:
         with urlopen(request, timeout=10) as response:
-            payload = json.load(response)
+            body = json.load(response)
+    except HTTPError as error:
+        if error.code != 404:
+            raise
+        body = {}
 
-        for collection in payload.get("collections", []):
-            if auth_value_set & _collection_auth_groups(collection):
-                collection_id = collection.get("id")
-                if isinstance(collection_id, str):
-                    collection_ids.append(collection_id)
-
-        url = _next_href(payload, url)
-
-    collection_ids = sorted(set(collection_ids))
-    _collection_cache[auth_values] = (now, collection_ids)
-    return collection_ids
+    _cache[path] = (time.monotonic(), body)
+    return body
 
 
-async def _items_auth_groups_filter(context: dict[str, Any]) -> str | dict[str, Any]:
-    groups = _groups(context)
-
-    if ADMIN_GROUP in groups:
-        return "1=1"
-
-    auth_values = tuple(sorted(_authorized_auth_values(groups)))
-
-    collection_ids = await asyncio.to_thread(_load_allowed_collection_ids, auth_values)
-
-    return _collection_ids_filter(collection_ids)
+def _readable_collection_ids(values: list[str]) -> list[str]:
+    """Ids of every collection the caller may read, filtered by pgstac."""
+    ids: list[str] = []
+    while True:
+        page = _get(
+            "/collections?"
+            + urlencode(
+                {
+                    "filter": json.dumps(_expr(values)),
+                    "filter-lang": "cql2-json",
+                    "limit": PAGE,
+                    "offset": len(ids),
+                }
+            )
+        )
+        collections = page.get("collections", [])
+        ids += [c["id"] for c in collections]
+        if not collections or len(ids) >= (page.get("numberMatched") or 0):
+            return ids
 
 
 @dataclasses.dataclass
 class CollectionsFilter:
-    """Allow collection reads based on collection auth:groups metadata."""
+    """Collections sharing an auth:groups value with the caller."""
 
     async def __call__(self, context: dict[str, Any]) -> str | dict[str, Any]:
-        return _auth_groups_filter(context)
+        values = _readable(context)
+        return "1=1" if values is None else _expr(values)
 
 
 @dataclasses.dataclass
 class ItemsFilter:
-    """Allow item reads for collections allowed by auth:groups metadata."""
+    """Items of those collections.
+
+    /collections/{id}/items and .../items/{item_id} name their collection, so
+    that one collection is the whole question - one lookup, whatever the size
+    of the catalogue. Only /search, which names none, has to resolve the set.
+    """
 
     async def __call__(self, context: dict[str, Any]) -> str | dict[str, Any]:
-        return await _items_auth_groups_filter(context)
+        values = _readable(context)
+        if values is None:
+            return "1=1"
+
+        collection_id = ((context.get("req") or {}).get("path_params") or {}).get(
+            "collection_id"
+        )
+        if collection_id:
+            collection = await asyncio.to_thread(
+                _get, f"/collections/{quote(collection_id, safe='')}"
+            )
+            groups = set(collection.get("auth:groups") or [])
+            return "1=1" if groups.intersection(values) else "1=0"
+
+        ids = await asyncio.to_thread(_readable_collection_ids, values)
+        return {"op": "in", "args": [{"property": "collection"}, ids]} if ids else "1=0"
