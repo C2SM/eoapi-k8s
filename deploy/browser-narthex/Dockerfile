@@ -60,6 +60,14 @@ RUN npm run build
 
 
 FROM nginxinc/nginx-unprivileged:1-alpine
+# Links the GHCR package to this repository, which is what lets this repo's
+# Actions token push to it. Without a link the package belongs to the org and
+# to no repository, and a push fails with
+# `denied: permission_denied: read_package` even though the build succeeded.
+# The very first push still needs the link granted by hand (Package settings ->
+# Manage Actions access -> add C2SM/eoapi-k8s with the Write role); this label
+# is what keeps it attached afterwards.
+LABEL org.opencontainers.image.source="https://github.com/C2SM/eoapi-k8s"
 ARG pathPrefix="/browser/"
 
 USER root
