@@ -47,7 +47,19 @@ wiring.
    the page is framed and calls `signinSilentCallback()` there, which is what
    makes renewal work without needing `offline_access`.
 
-4. **Dead-session cleanup and logout.** `addAccessTokenExpired` cleared the UI
+4. **Opt-in silent sign-in on load** (`authConfig.autoSignIn`). `resume()`
+   only rehydrated from storage, so a browser holding no token showed the
+   anonymous view even when the provider had a live session — after signing out
+   here and back in there, or on a first visit in an already-signed-in browser.
+   The user clicks "Log in", it completes with no prompt, and the button looks
+   like it merely reloaded the page. Off unless the deployment asks for it: it
+   costs every anonymous visitor one `prompt=none` request, and it is only
+   cheap when `silent_redirect_uri` points at a page that answers quickly
+   rather than at this application — see fix (3) and `browser.oidcSilentRenew`
+   in the chart. Skipped while a redirect sign-in is being completed, which
+   would otherwise race `confirmLogin()` for the stored state.
+
+5. **Dead-session cleanup and logout.** `addAccessTokenExpired` cleared the UI
    but left the expired user in storage, so the Browser showed "Log in" on top
    of a stored token; `resume()` also assumed `signinSilent()` resolves.
    Both now remove the user. `logout()` no longer calls `signoutRedirect()`,
@@ -57,4 +69,4 @@ wiring.
    clears local state and, if `authConfig.logoutUrl` is set, sends the browser
    to the provider's own logout page.
 
-Fixes 1, 2 and 4 are useful anywhere. Fix 3 is the one that matters here.
+Fixes 1, 2 and 5 are useful anywhere. Fix 3 is the one that matters here.

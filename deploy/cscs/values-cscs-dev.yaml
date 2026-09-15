@@ -89,6 +89,9 @@ browser:
   # deploy/cscs/auth-authelia/authelia-configmap.yaml - Authelia rejects any
   # redirect URI it does not have registered.
   oidcSilentRenew: true
+  # Pick up an existing Authelia session on load instead of waiting for a click.
+  # Requires oidcSilentRenew above; the chart fails the render otherwise.
+  oidcAutoSignIn: true
   catalogImage: "https://ethz.ch/content/dam/ethz/special-interest/usys/c2sm-dam/center/logos/logo_xlarge.gif"
   footerLinks:
     - label: "ETH Zürich"
