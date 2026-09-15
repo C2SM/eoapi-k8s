@@ -4,5 +4,6 @@ It doesn't create any resources but ensures configuration consistency.
 */}}
 {{- include "eoapi.validatePostgresql" . }}
 {{- include "eoapi.validateStacAuthProxy" . }}
+{{- include "eoapi.validateBrowserAuth" . }}
 {{- include "eoapi.validateAutoscaleRules" . }}
 {{- include "eoapi.validateHpaAdapterMetricAlignment" . }}

@@ -13,7 +13,7 @@ spec:
       app: {{ .Release.Name }}-browser
   template:
     metadata:
-      {{- if or .Values.browser.customConfig .Values.browser.favicon }}
+      {{- if include "eoapi.browserConfigMapEnabled" . }}
       annotations:
         checksum/browser-config: {{ include (print $.Template.BasePath "/services/browser/configmap.yaml") . | sha256sum }}
       {{- end }}
@@ -59,10 +59,14 @@ spec:
                   {{- if .Values.browser.oidcLogoutUrl }}
                   "logoutUrl": "{{ .Values.browser.oidcLogoutUrl }}",
                   {{- end }}
+                  {{- if .Values.browser.oidcAutoSignIn }}
+                  "autoSignIn": true,
+                  {{- end }}
                   "oidcConfig": {
                     "client_id": "{{ .Values.browser.oidcClientId | default "test-client" }}",
                     "redirect_uri": "{{ if .Values.ingress.tls.enabled }}https{{ else }}http{{ end }}://{{ .Values.ingress.host }}{{ .Values.browser.ingress.path | default "/browser" | trimSuffix "/" }}/auth",
-                    "scope": "{{ .Values.browser.oidcScope | default "openid" }}"
+                    "scope": "{{ .Values.browser.oidcScope | default "openid" }}"{{ if .Values.browser.oidcSilentRenew }},
+                    "silent_redirect_uri": "{{ if .Values.ingress.tls.enabled }}https{{ else }}http{{ end }}://{{ .Values.ingress.host }}{{ .Values.browser.ingress.path | default "/browser" | trimSuffix "/" }}/silent-renew.html"{{ end }}
                   }
                 }
               {{- end }}
@@ -76,7 +80,7 @@ spec:
             {{- end }}
           resources:
           {{- toYaml .Values.browser.settings.resources | nindent 12 }}
-          {{- if or .Values.browser.customConfig .Values.browser.favicon }}
+          {{- if include "eoapi.browserConfigMapEnabled" . }}
           volumeMounts:
             {{- if .Values.browser.customConfig }}
             - name: browser-custom-config
@@ -90,12 +94,18 @@ spec:
               subPath: favicon.png
               readOnly: true
             {{- end }}
+            {{- if .Values.browser.oidcSilentRenew }}
+            - name: browser-custom-config
+              mountPath: /etc/eoapi/browser/silent-renew.html
+              subPath: silent-renew.html
+              readOnly: true
+            {{- end }}
             - name: browser-custom-config
               mountPath: /docker-entrypoint.d/50-browser-custom-config.sh
               subPath: 50-browser-custom-config.sh
               readOnly: true
           {{- end }}
-      {{- if or .Values.browser.customConfig .Values.browser.favicon }}
+      {{- if include "eoapi.browserConfigMapEnabled" . }}
       volumes:
         - name: browser-custom-config
           configMap:

@@ -584,6 +584,14 @@
           "type": "string",
           "description": "Where 'Log out' ends the identity provider session, for providers advertising no end_session_endpoint (e.g. Authelia). Empty for providers that do"
         },
+        "oidcSilentRenew": {
+          "type": "boolean",
+          "description": "Serve a silent-renew landing page and point silent_redirect_uri at it; without it background token renewal boots the whole app in a hidden iframe and times out"
+        },
+        "oidcAutoSignIn": {
+          "type": "boolean",
+          "description": "On load with no stored token, ask the provider for one without prompting. Requires oidcSilentRenew"
+        },
         "authConfig": {
           "type": "object",
           "description": "Full override of the SB_authConfig document the chart otherwise builds from browser.oidc*. Set this only to reach an oidc-client-ts setting the oidc* values do not expose"

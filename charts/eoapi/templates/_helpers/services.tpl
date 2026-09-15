@@ -143,3 +143,13 @@ initContainers:
     {{- end }}
 {{- end }}
 {{- end -}}
+
+{{/*
+Whether the browser needs its extra ConfigMap mounted. Three independent
+values feed one ConfigMap, and the deployment has to agree with it in three
+places (checksum annotation, volume, volumeMounts) - so the condition lives
+here rather than being repeated and drifting.
+*/}}
+{{- define "eoapi.browserConfigMapEnabled" -}}
+{{- if or .Values.browser.customConfig .Values.browser.favicon .Values.browser.oidcSilentRenew -}}true{{- end -}}
+{{- end }}

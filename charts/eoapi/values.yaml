@@ -683,6 +683,19 @@ browser:
   # the browser would otherwise attempt fails and leaves the IdP session
   # standing. Leave empty for providers that do advertise one.
   oidcLogoutUrl: ""
+  # Serve a small silent-renew landing page at <browser path>/silent-renew.html
+  # and point oidc-client-ts's silent_redirect_uri at it. Without it that
+  # setting falls back to redirect_uri - the application itself - and every
+  # background token renewal boots the whole SPA inside a hidden iframe and
+  # times out, so tokens simply expire after an hour. Off by default because it
+  # adds a served file; set it wherever the browser does real OIDC login.
+  oidcSilentRenew: false
+  # On load with no stored token, ask the provider for one without prompting.
+  # Turns "signed in at the provider but the Browser still shows the anonymous
+  # view until you click Log in" into signing in by itself. Requires
+  # oidcSilentRenew - without a working silent landing page the attempt stalls
+  # for the iframe timeout on every page load, including anonymous ones.
+  oidcAutoSignIn: false
   # Optional: Override the STAC catalog URL for the browser
   # If not set, will be constructed from ingress.host and stac.ingress.path
   # Useful when using custom ingress solutions with ingress.enabled=false

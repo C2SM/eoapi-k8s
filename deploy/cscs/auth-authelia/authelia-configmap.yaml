@@ -262,6 +262,11 @@ data:
             # as a refresh token, which is the right bound for a browser app.
             redirect_uris:
               - 'https://prometheus-dev.c2sm-tds.c2sm.cscs.ch/browser/auth'
+              # Landing page for prompt=none requests made in a hidden iframe,
+              # served by the browser itself (browser.oidcSilentRenew). Separate
+              # from /browser/auth because that route is the application, which
+              # is too heavy to answer from inside a hidden frame.
+              - 'https://prometheus-dev.c2sm-tds.c2sm.cscs.ch/browser/silent-renew.html'
 
           - client_id: 'narthex'
             client_name: 'Narthex'

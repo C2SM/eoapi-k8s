@@ -84,6 +84,11 @@ browser:
   # the only thing that really signs a user out - same URL as
   # narthex-frontend.logoutUrl below.
   oidcLogoutUrl: "https://auth-prometheus-dev.c2sm-tds.c2sm.cscs.ch/logout"
+  # Serves /browser/silent-renew.html and points silent_redirect_uri at it.
+  # Must be listed in the `stac-browser` client's redirect_uris in
+  # deploy/cscs/auth-authelia/authelia-configmap.yaml - Authelia rejects any
+  # redirect URI it does not have registered.
+  oidcSilentRenew: true
   catalogImage: "https://ethz.ch/content/dam/ethz/special-interest/usys/c2sm-dam/center/logos/logo_xlarge.gif"
   footerLinks:
     - label: "ETH Zürich"

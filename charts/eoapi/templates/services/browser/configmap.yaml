@@ -1,4 +1,4 @@
-{{- if and .Values.browser.enabled (or .Values.browser.customConfig .Values.browser.favicon) }}
+{{- if and .Values.browser.enabled (include "eoapi.browserConfigMapEnabled" .) }}
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -7,6 +7,31 @@ data:
 {{- if .Values.browser.customConfig }}
   browser_config.js: |-
 {{- .Values.browser.customConfig | nindent 4 }}
+{{- end }}
+{{- if .Values.browser.oidcSilentRenew }}
+  # Landing page for oidc-client-ts's silent flows: the hidden iframe it opens
+  # to renew an access token, and to pick up an existing provider session.
+  #
+  # Deliberately not the application. Left unset, silent_redirect_uri copies
+  # redirect_uri, so the iframe boots the whole SPA - router, store, catalog -
+  # before anything can answer the parent, and does not reliably get that far
+  # inside a hidden zero-size frame; the parent then waits out its timeout on
+  # every attempt. All the parent needs is the callback URL handed back:
+  # oidc-client-ts listens for exactly this message, checks the origin, and
+  # matches `state` itself.
+  silent-renew.html: |-
+    <!doctype html>
+    <html lang="en">
+      <head><meta charset="utf-8"><title>Silent renew</title></head>
+      <body>
+        <script>
+          window.parent.postMessage(
+            { source: "oidc-client", url: window.location.href, keepOpen: false },
+            window.location.origin
+          );
+        </script>
+      </body>
+    </html>
 {{- end }}
   50-browser-custom-config.sh: |-
     #!/bin/sh
@@ -17,6 +42,9 @@ data:
     # that generated config survives. Content should assign extra properties
     # onto the already-defined window.STAC_BROWSER_CONFIG object.
     cat /etc/eoapi/browser/browser_config.js >> /usr/share/nginx/html/runtime-config.js
+    {{- end }}
+    {{- if .Values.browser.oidcSilentRenew }}
+    cp /etc/eoapi/browser/silent-renew.html /usr/share/nginx/html/silent-renew.html
     {{- end }}
     {{- if .Values.browser.favicon }}
     cp /etc/eoapi/browser/favicon.png /usr/share/nginx/html/favicon.png

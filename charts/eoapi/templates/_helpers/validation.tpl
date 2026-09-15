@@ -71,3 +71,16 @@ Ensures stac-auth-proxy cannot be enabled when stac is disabled
 {{- end }}
 {{- end }}
 {{- end -}}
+
+{{/*
+Validate the browser's silent-auth settings.
+oidcAutoSignIn without oidcSilentRenew is the misconfiguration that matters:
+silent_redirect_uri then falls back to the application itself, so the sign-in
+attempt on every page load boots the SPA in a hidden iframe and waits out the
+full timeout - including for anonymous visitors, who pay it for nothing.
+*/}}
+{{- define "eoapi.validateBrowserAuth" -}}
+{{- if and .Values.browser.oidcAutoSignIn (not .Values.browser.oidcSilentRenew) }}
+{{- fail "browser.oidcAutoSignIn requires browser.oidcSilentRenew: without the silent landing page every page load stalls for the iframe timeout (~10s), anonymous ones included." }}
+{{- end }}
+{{- end -}}

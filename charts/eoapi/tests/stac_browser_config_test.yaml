@@ -4,6 +4,7 @@ templates:
   - templates/services/browser/configmap.yaml
   - templates/_helpers/core.tpl
   - templates/_helpers/networking.tpl
+  - templates/_helpers/services.tpl
 tests:
   - it: "stac browser custom config configmap"
     set:
