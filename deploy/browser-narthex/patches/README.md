@@ -47,16 +47,7 @@ wiring.
    the page is framed and calls `signinSilentCallback()` there, which is what
    makes renewal work without needing `offline_access`.
 
-4. **Silent sign-in on load.** `resume()` only ever rehydrated from storage,
-   so a browser with no stored token showed the anonymous view even when the
-   provider had a live session - after a logout and a fresh sign-in, or on a
-   first visit in an already-signed-in browser. The user then clicks "Log in",
-   it completes with no prompt, and the button appears to have done nothing
-   but reload the page. It now asks the provider silently when nothing is
-   stored. This depends on (3): without a working silent callback the attempt
-   would hang for the iframe timeout on every page load.
-
-5. **Dead-session cleanup and logout.** `addAccessTokenExpired` cleared the UI
+4. **Dead-session cleanup and logout.** `addAccessTokenExpired` cleared the UI
    but left the expired user in storage, so the Browser showed "Log in" on top
    of a stored token; `resume()` also assumed `signinSilent()` resolves.
    Both now remove the user. `logout()` no longer calls `signoutRedirect()`,
@@ -66,4 +57,4 @@ wiring.
    clears local state and, if `authConfig.logoutUrl` is set, sends the browser
    to the provider's own logout page.
 
-Fixes 1, 2, 4 and 5 are useful anywhere. Fix 3 is what the others rest on.
+Fixes 1, 2 and 4 are useful anywhere. Fix 3 is the one that matters here.

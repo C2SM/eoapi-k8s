@@ -1,5 +1,5 @@
 diff --git a/src/auth/oidc.js b/src/auth/oidc.js
-index a1fb696..0b3aebd 100644
+index a1fb696..bd778c9 100644
 --- a/src/auth/oidc.js
 +++ b/src/auth/oidc.js
 @@ -1,6 +1,6 @@
@@ -10,7 +10,7 @@ index a1fb696..0b3aebd 100644
  
  export default class OIDC extends Auth {
  
-@@ -12,20 +12,59 @@ export default class OIDC extends Auth {
+@@ -12,20 +12,43 @@ export default class OIDC extends Auth {
        client_id: 'stac-browser',
        post_logout_redirect_uri: this.getRedirectUri('/auth/logout'),
        redirect_uri: this.getRedirectUri('/auth'),
@@ -55,26 +55,10 @@ index a1fb696..0b3aebd 100644
 +      if (!user) {
 +        await this.manager.removeUser();
 +      }
-+    }
-+
-+    if (!user) {
-+      // Nothing stored here, but the provider may still have a session: after
-+      // a logout and a fresh sign-in there, or on a first visit in a browser
-+      // that is already signed in elsewhere. Without this the Browser shows
-+      // its anonymous view until the user clicks "Log in", and that click
-+      // then completes with no prompt - which reads as the button doing
-+      // nothing but a reload. Asking costs one prompt=none request; if there
-+      // is no session it fails and we stay logged out, showing no prompt.
-+      try {
-+        user = await this.manager.signinSilent();
-+      }
-+      catch (error) {
-+        user = null;
-+      }
      }
  
      if (user && !user.expired) {
-@@ -52,6 +91,15 @@ export default class OIDC extends Auth {
+@@ -52,6 +75,15 @@ export default class OIDC extends Auth {
    }
  
    async confirmLogin() {
@@ -90,7 +74,7 @@ index a1fb696..0b3aebd 100644
      const user = await this.manager.signinRedirectCallback();
      await this.setUser(user);
      this.restoreOriginalUri();
-@@ -59,7 +107,17 @@ export default class OIDC extends Auth {
+@@ -59,7 +91,17 @@ export default class OIDC extends Auth {
  
    async logout(credentials) {
      await super.logout(credentials);
