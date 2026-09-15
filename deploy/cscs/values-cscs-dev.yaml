@@ -73,7 +73,17 @@ browser:
   # The "groups" scope gets group membership into the token; Authelia also
   # needs claims_policies.eoapi to copy it out of /userinfo. Both halves are
   # required or custom_filters.py sees no groups.
+  #
+  # No "offline_access": Authelia prompts for consent on every request that
+  # asks for it and will not pre-configure that away, so a refresh token costs
+  # a consent click per login. Renewal goes through the silent-renew iframe
+  # instead - see the `stac-browser` client in authelia-configmap.yaml.
   oidcScope: "openid email profile groups"
+  # Authelia advertises no end_session_endpoint, so the browser's OIDC logout
+  # would throw and leave the shared session standing. Its portal logout is
+  # the only thing that really signs a user out - same URL as
+  # narthex-frontend.logoutUrl below.
+  oidcLogoutUrl: "https://auth-prometheus-dev.c2sm-tds.c2sm.cscs.ch/logout"
   catalogImage: "https://ethz.ch/content/dam/ethz/special-interest/usys/c2sm-dam/center/logos/logo_xlarge.gif"
   footerLinks:
     - label: "ETH Zürich"
@@ -151,6 +161,14 @@ narthex-frontend:
   # Must match a redirect_uri on the `narthex` client in
   # deploy/cscs/auth-authelia/authelia-configmap.yaml.
   oidcRedirectUri: "https://narthex-prometheus-dev.c2sm-tds.c2sm.cscs.ch/auth/callback"
+  # Spelled out rather than left to narthex's default, because the scopes have
+  # to match the `narthex` client's `scopes` in authelia-configmap.yaml -
+  # request one that is not granted there and Authelia rejects the whole
+  # authorization request. No "offline_access" (Authelia would prompt for
+  # consent on every login) and no "groups" (narthex-backend authorizes named
+  # lists by preferred_username, and every claim costs header budget - Traefik's
+  # ceiling here is ~3-4 KB).
+  oidcScope: "openid profile email"
   # Ends the shared Authelia session - the only thing that really logs a user
   # out of every app.
   logoutUrl: "https://auth-prometheus-dev.c2sm-tds.c2sm.cscs.ch/logout"
@@ -172,7 +190,7 @@ narthex-frontend:
       # preserved, never rendered as HTML.
       message: |
         You will be taken to the Santis JupyterHub next. On that page you
-        need to select "eobs-lab" as the uenv.
+        need to select "eobs-lab" as the uenv and "lab" as the view.
 
         If you plan to access grimsel data, that is currently only possible
         via the "es-data" reservation, which you have to specify under

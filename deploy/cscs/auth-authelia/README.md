@@ -127,12 +127,42 @@ kubectl -n eoapi-dev create secret generic authelia-secret \
   --from-literal=storage-encryption-key="$(openssl rand -hex 64)" \
   --from-literal=oidc-hmac-secret="$(openssl rand -hex 64)" \
   --from-literal=identity-validation-jwt-secret="$(openssl rand -hex 64)" \
+  --from-literal=redis-password="$(openssl rand -hex 32)" \
   --from-file=oidc-jwks.pem=./oidc-jwks.pem \
   --from-file=users-database.yml=./users-database.yml
 ```
 
-Sessions are in memory (no Redis), so restarting Authelia logs everyone out.
-The OIDC signing key is unaffected, so nothing needs a JWKS-cache restart.
+The Postgres password is *not* here: PGO generates it with the `authelia`
+PostgresCluster and publishes it as `authelia-pguser-authelia`, which the
+Deployment mounts directly.
+
+## Storage
+
+Two backing stores, both required, neither holding anything irreplaceable:
+
+| What | Where | If it is lost |
+|---|---|---|
+| OIDC grants, opaque ids, preferences | PostgresCluster `authelia` | OIDC audit trail; `sub` values are re-minted |
+| Browser sessions | Redis (`eoapi-dev-authelia-redis`) | everyone signs in again |
+
+Losing either loses **no** named lists: narthex owns rows by
+`preferred_username`, not by the `sub` this database mints.
+
+Both replaced a simpler arrangement that did not survive contact with real
+use, and neither should be reverted:
+
+- **SQLite → Postgres.** Not a size problem. Authelia's schema has no index on
+  `signature`, the column the token endpoint looks a code up by, so a code
+  exchange scanned the whole authorization-code table — at ~47k rows that was
+  10–50s per login. And SQLite's single-writer `journal_mode=delete` turned
+  concurrent OIDC requests into `database is locked`, which reaches the user as
+  a login that simply fails.
+- **In-memory sessions → Redis.** Every restart of the Authelia pod — a config
+  edit, an image bump, a node drain — signed every user out of every app,
+  which defeats the point of one shared session.
+
+Authelia migrates its own schema at startup (`Storage schema is being checked
+for updates`), so a fresh database needs no migration step.
 
 ## Deploy
 
@@ -184,11 +214,35 @@ nasa-reader 5, dyamond-reader 7, anonymous 1.
 
 ## Notes
 
-- **No single sign-out.** Authelia advertises no `end_session_endpoint`, so
-  app-level logout only clears local state and the next login is silent — the
-  flip side of the shared session. A real sign-out means visiting
-  `https://auth-prometheus-dev.c2sm-tds.c2sm.cscs.ch/logout`, which is where
-  `narthex-frontend.logoutUrl` points.
+- **No OIDC single sign-out.** Authelia advertises no `end_session_endpoint`
+  and 4.39 has no option to enable one, so RP-initiated logout is unavailable:
+  an app calling it gets `No end session endpoint` thrown at it. Ending the
+  shared session means visiting
+  `https://auth-prometheus-dev.c2sm-tds.c2sm.cscs.ch/logout`, which is what
+  both `narthex-frontend.logoutUrl` and `browser.oidcLogoutUrl` point at. Both
+  apps clear their own tokens first and then send the browser there, so
+  "Log out" ends the session everywhere. Without that URL configured, logout
+  is local-only and the next login is silent — which reads like the login
+  button is lying.
+- **No `offline_access`, deliberately.** Refresh tokens and silent login are
+  mutually exclusive on Authelia 4.39. It forces a consent screen on every
+  authorization request carrying `offline_access` whatever `consent_mode`
+  says, and `pre-configured` mode does not help: it stores the grant with
+  `offline_access` stripped out, so the stored consent never matches and the
+  prompt comes back every time. Verified — the row in
+  `oauth2_consent_preconfiguration` reads `openid|email|profile|groups` after
+  consenting to a request that included it.
+
+  The SPAs renew through a hidden iframe to the authorization endpoint with
+  `prompt=none` instead, which Authelia answers from the session cookie with a
+  303 back to the app's own origin. Its `X-Frame-Options: DENY` does not
+  interfere: that header only ever rides on pages Authelia itself renders, and
+  in a successful silent renew none are. Sessions therefore last as long as the
+  Authelia session (12h, 4h inactivity), which is the right bound for a browser
+  app anyway.
+
+  Requesting any scope not also granted in the client's `scopes` here makes
+  Authelia reject the whole authorization request.
 - **No bearer-token curl testing.** Authelia does not implement the ROPC
   password grant. If an API smoke test is needed, use a `client_credentials`
   client with the `authelia.bearer.authz` scope.

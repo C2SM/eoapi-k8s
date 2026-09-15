@@ -1,0 +1,81 @@
+# Authelia's SQL storage: OIDC authorization/consent/token records, user
+# opaque identifiers and per-user preferences. NOT the OIDC signing key (that
+# comes from the `authelia-secret` Secret) and NOT the browser sessions (those
+# live in Redis, see authelia-redis.yaml).
+#
+# This replaces the SQLite file this deployment used until now. SQLite was not
+# a size problem but a concurrency and index problem: its single-writer
+# `journal_mode=delete` turned overlapping OIDC requests into
+# "database is locked" errors that surface to the user as a failed login, and
+# Authelia's schema has no index on `signature` -- the column the token
+# endpoint looks a code up by -- so a code exchange full-scanned the
+# authorization-code table. With ~47k rows that took 10-50 seconds per login.
+#
+# A third PostgresCluster rather than a database inside the eoapi or narthex
+# clusters: Authelia is infrastructure for the whole deployment, not an app
+# inside it, and everything else it needs already lives in this directory as
+# plain manifests applied with `kubectl apply -f`.
+#
+# No `backups` stanza, matching postgrescluster-narthex: nothing here is
+# irreplaceable. Losing it logs everyone out and drops the OIDC audit trail;
+# it does not lose a single named list (narthex owns rows by
+# `preferred_username`, not by the `sub` this database mints).
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: eoapi-dev-authelia-initdb
+  namespace: eoapi-dev
+  labels:
+    app.kubernetes.io/name: authelia
+    app.kubernetes.io/part-of: eoapi-dev-auth-authelia
+data:
+  # Run once as the superuser by PGO (spec.databaseInitSQL below), against the
+  # `postgres` database - hence the \c.
+  #
+  # PG15+ made `public` owned by pg_database_owner and revoked CREATE from
+  # PUBLIC, and PGO creates the database owned by `postgres`, not by the
+  # application role. The application role is therefore NOT the database owner
+  # and gets no CREATE on `public`, so Authelia's startup schema migration
+  # fails with a permission error. Same reason the chart has
+  # templates/database/narthex-superuser-initdb.yaml, and the same remedy.
+  init.sql: |
+    \c authelia
+    ALTER SCHEMA public OWNER TO authelia;
+---
+apiVersion: postgres-operator.crunchydata.com/v1beta1
+kind: PostgresCluster
+metadata:
+  name: authelia
+  namespace: eoapi-dev
+  labels:
+    app.kubernetes.io/name: authelia
+    app.kubernetes.io/part-of: eoapi-dev-auth-authelia
+spec:
+  databaseInitSQL:
+    name: eoapi-dev-authelia-initdb
+    key: init.sql
+  # Matches the eoapi and narthex clusters, so PGO runs one Postgres image.
+  postgresVersion: 16
+  instances:
+    - name: authelia
+      replicas: 1
+      dataVolumeClaimSpec:
+        accessModes:
+          - "ReadWriteOnce"
+        storageClassName: ceph-corbo-rbd-nvme-retain
+        resources:
+          requests:
+            # Authelia's own working set here is a few MB. The headroom is
+            # for WAL and for the OIDC session tables between prunes.
+            storage: 5Gi
+  users:
+    # PGO creates the role, the database, and a Secret named
+    # `authelia-pguser-authelia` holding the generated password; the
+    # Deployment mounts that Secret and reads it via
+    # AUTHELIA_STORAGE_POSTGRES_PASSWORD_FILE.
+    #
+    # This role owns the database's tables but is NOT the database owner, so
+    # it needs `public` handed to it explicitly - see databaseInitSQL above.
+    - name: authelia
+      databases:
+        - authelia

@@ -86,6 +86,13 @@ data:
       inactivity: '4h'
       expiration: '12h'
       remember_me: '1M'
+      # Without a provider here Authelia keeps sessions in memory, so every
+      # restart of this pod - a config edit, an image bump, a node drain -
+      # signs everyone out of every app. See authelia-redis.yaml.
+      redis:
+        host: 'eoapi-dev-authelia-redis.eoapi-dev.svc.cluster.local'
+        port: 6379
+        database_index: 0
       cookies:
         # One cookie for the whole family, so one login covers every app and
         # every client_id. authelia_url must be a subdomain of `domain`.
@@ -98,9 +105,42 @@ data:
       find_time: '2m'
       ban_time: '10m'
 
+    # PostgresCluster `authelia` (authelia-postgrescluster.yaml). The password
+    # comes from PGO's generated authelia-pguser-authelia Secret via
+    # AUTHELIA_STORAGE_POSTGRES_PASSWORD_FILE on the Deployment.
+    #
+    # Was SQLite until the OIDC tables reached ~47k rows. Authelia's schema
+    # has no index on `signature`, which is what the token endpoint looks a
+    # code up by, so every code exchange scanned the whole authorization-code
+    # table - 10-50s per login - and SQLite's single-writer journal turned
+    # concurrent OIDC requests into "database is locked" login failures.
+    # Postgres fixes the locking outright and makes the unindexed scan
+    # irrelevant at this row count.
+    #
+    # `address` (not host/port) is the 4.38+ spelling; `authelia-primary` is
+    # the Service PGO creates for the cluster's primary instance.
+    # PGO issues the Postgres server certificate from its own CA
+    # (CN=postgres-operator-ca), which is in no system trust store, and its
+    # pg_hba.conf has only `hostssl ... scram-sha-256` - there is no plaintext
+    # rule to fall back to. Both halves are required: without the CA here the
+    # connection fails verification, without TLS at all Postgres rejects it
+    # outright with "no pg_hba.conf entry ... no encryption".
+    certificates_directory: '/certs'
+
     storage:
-      local:
-        path: '/data/db.sqlite3'
+      postgres:
+        # `authelia-primary.eoapi-dev.svc`, not the .cluster.local form: the
+        # certificate's SAN carries the fully-qualified name with a trailing
+        # dot ("...cluster.local."), and this spelling matches a SAN exactly
+        # with no dot-normalisation to depend on.
+        address: 'tcp://authelia-primary.eoapi-dev.svc:5432'
+        database: 'authelia'
+        schema: 'public'
+        username: 'authelia'
+        timeout: '5s'
+        tls:
+          server_name: 'authelia-primary.eoapi-dev.svc'
+          minimum_version: 'TLS1.2'
 
     notifier:
       disable_startup_check: true
@@ -184,7 +224,7 @@ data:
           #     that stac-auth-proxy / narthex-backend validate.
           #   requested_audience_mode - Authelia grants no audience unless the
           #     client asks, and oidc-client-ts never asks.
-          #   consent_mode - no consent click when hopping between apps.
+          #   consent_mode - one consent click ever, not one per login.
           - client_id: 'stac-browser'
             client_name: 'STAC Browser'
             public: true
@@ -202,6 +242,24 @@ data:
               - 'profile'
               - 'email'
               - 'groups'
+            # Deliberately NOT 'offline_access', which would be the obvious way
+            # to give these SPAs a refresh token. Authelia forces a consent
+            # screen on every authorization request that asks for it, whatever
+            # `consent_mode` says, and refuses to pre-configure it away: with
+            # `consent_mode: 'pre-configured'` it stores the grant with
+            # offline_access stripped out (verified - the row in
+            # oauth2_consent_preconfiguration reads `openid|email|profile|groups`),
+            # so the stored consent can never match the request and the prompt
+            # returns every single time. Refresh tokens and silent login are
+            # mutually exclusive here.
+            #
+            # These SPAs do not need one. Renewal goes through a hidden iframe
+            # to the authorization endpoint with prompt=none, which Authelia
+            # answers from the session cookie with a 303 straight back to the
+            # app's own origin - its X-Frame-Options only ever applies to
+            # pages Authelia itself renders. Sessions therefore last as long
+            # as the Authelia session (12h, 4h inactivity) rather than as long
+            # as a refresh token, which is the right bound for a browser app.
             redirect_uris:
               - 'https://prometheus-dev.c2sm-tds.c2sm.cscs.ch/browser/auth'
 
@@ -222,6 +280,24 @@ data:
               - 'profile'
               - 'email'
               - 'groups'
+            # Deliberately NOT 'offline_access', which would be the obvious way
+            # to give these SPAs a refresh token. Authelia forces a consent
+            # screen on every authorization request that asks for it, whatever
+            # `consent_mode` says, and refuses to pre-configure it away: with
+            # `consent_mode: 'pre-configured'` it stores the grant with
+            # offline_access stripped out (verified - the row in
+            # oauth2_consent_preconfiguration reads `openid|email|profile|groups`),
+            # so the stored consent can never match the request and the prompt
+            # returns every single time. Refresh tokens and silent login are
+            # mutually exclusive here.
+            #
+            # These SPAs do not need one. Renewal goes through a hidden iframe
+            # to the authorization endpoint with prompt=none, which Authelia
+            # answers from the session cookie with a 303 straight back to the
+            # app's own origin - its X-Frame-Options only ever applies to
+            # pages Authelia itself renders. Sessions therefore last as long
+            # as the Authelia session (12h, 4h inactivity) rather than as long
+            # as a refresh token, which is the right bound for a browser app.
             redirect_uris:
               - 'https://narthex-prometheus-dev.c2sm-tds.c2sm.cscs.ch/auth/callback'
 

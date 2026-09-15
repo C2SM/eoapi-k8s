@@ -672,7 +672,17 @@ browser:
   # OIDC scope requested by the browser's own login (oidc-client-ts). Widen
   # this if anything downstream of the browser's token needs claims beyond
   # "openid" alone, e.g. a group-based authorization check needing "groups".
+  # Whatever is listed here must also be granted to the client by the provider,
+  # or it rejects the whole authorization request. Think before adding
+  # "offline_access": some providers (Authelia) force a consent prompt on every
+  # login that asks for it, which costs more than the refresh token is worth.
   oidcScope: "openid"
+  # Optional: where the browser's "Log out" sends the user to end the session
+  # at the identity provider itself. Needed for providers that advertise no
+  # end_session_endpoint (e.g. Authelia), where the OIDC RP-initiated logout
+  # the browser would otherwise attempt fails and leaves the IdP session
+  # standing. Leave empty for providers that do advertise one.
+  oidcLogoutUrl: ""
   # Optional: Override the STAC catalog URL for the browser
   # If not set, will be constructed from ingress.host and stac.ingress.path
   # Useful when using custom ingress solutions with ingress.enabled=false
@@ -792,6 +802,11 @@ narthex-frontend:
   # Must match a redirect URI registered for oidcClientId with the OIDC
   # provider, e.g. "https://<host>/narthex/auth/callback".
   oidcRedirectUri: ""
+  # Space-separated OIDC scopes. Empty uses narthex's own default
+  # ("openid profile email" - see frontend/src/runtimeConfig.ts). Must match
+  # what the provider grants this client, or it rejects the whole authorization
+  # request.
+  oidcScope: ""
   # JupyterHub/notebook launch targets (narthex's "Launch in JupyterHub"
   # button) - rendered as a YAML ConfigMap mounted into the pod and read via
   # NARTHEX_LAUNCH_CONFIGS_FILE (narthex frontend/src/launchConfigs.ts,

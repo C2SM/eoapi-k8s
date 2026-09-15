@@ -44,6 +44,16 @@ RUN --mount=type=secret,id=narthex_repo_token \
     cp narthex-widget/SaveToNarthex.vue ./SaveToNarthex.vue && \
     rm -rf narthex-widget narthex-widget.tar.bz2
 
+# Fixes to stac-browser's own OIDC client that have to be compiled in:
+# oidc-client-ts is configured in src/auth/oidc.js and the only thing
+# authConfig can inject is JSON, so a UserManager needing a real object
+# (userStore) cannot be reached from runtime config. See patches/ for what
+# each one is for. `git apply` (not `patch`) so a patch that no longer matches
+# the pinned STAC_BROWSER_REF fails the build loudly instead of fuzzing itself
+# into the wrong place.
+COPY patches/ /patches/
+RUN git apply --verbose /patches/*.patch
+
 RUN npm install
 RUN [ "${DYNAMIC_CONFIG}" = "true" ] && sed -i 's/<!--RC//;s/RC-->//' index.html
 RUN npm run build

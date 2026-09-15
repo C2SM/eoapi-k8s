@@ -53,6 +53,8 @@ spec:
               value: {{ $nf.oidcClientId | default "narthex" | quote }}
             - name: NARTHEX_OIDC_REDIRECT_URI
               value: {{ $nf.oidcRedirectUri | quote }}
+            - name: NARTHEX_OIDC_SCOPE
+              value: {{ $nf.oidcScope | quote }}
             - name: NARTHEX_LAUNCH_CONFIGS_FILE
               value: /etc/narthex/launch-configs.yaml
           volumeMounts:

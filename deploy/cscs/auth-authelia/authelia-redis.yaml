@@ -1,0 +1,141 @@
+# Authelia's session provider.
+#
+# Without this, `session` falls back to Authelia's in-memory store and every
+# restart of the Authelia pod signs every user out of every app -- including a
+# no-op config edit, an image bump or a node drain. Redis makes the shared
+# browser session outlive the process that issues it, which is the whole point
+# of having one shared session in the first place.
+#
+# Deliberately not Postgres: Authelia's session provider supports exactly
+# `memory` and `redis`, so this is not a choice between two working options.
+#
+# appendonly, on a PVC, because a session store that forgets on restart is the
+# thing being fixed here -- an in-memory Redis would only move the problem one
+# pod across.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: eoapi-dev-authelia-redis-data
+  namespace: eoapi-dev
+  labels:
+    app.kubernetes.io/name: authelia-redis
+    app.kubernetes.io/part-of: eoapi-dev-auth-authelia
+spec:
+  accessModes:
+    - "ReadWriteOnce"
+  storageClassName: ceph-corbo-rbd-nvme-retain
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: eoapi-dev-authelia-redis
+  namespace: eoapi-dev
+  labels:
+    app.kubernetes.io/name: authelia-redis
+    app.kubernetes.io/part-of: eoapi-dev-auth-authelia
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: authelia-redis
+    app.kubernetes.io/part-of: eoapi-dev-auth-authelia
+  ports:
+    - name: redis
+      port: 6379
+      targetPort: redis
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: eoapi-dev-authelia-redis
+  namespace: eoapi-dev
+  labels:
+    app.kubernetes.io/name: authelia-redis
+    app.kubernetes.io/part-of: eoapi-dev-auth-authelia
+spec:
+  replicas: 1
+  # ReadWriteOnce PVC: never two writers, and the old pod must release the
+  # volume before the new one starts.
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: authelia-redis
+      app.kubernetes.io/part-of: eoapi-dev-auth-authelia
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: authelia-redis
+        app.kubernetes.io/part-of: eoapi-dev-auth-authelia
+    spec:
+      securityContext:
+        runAsUser: 999
+        runAsGroup: 999
+        fsGroup: 999
+        runAsNonRoot: true
+      containers:
+        - name: redis
+          image: redis:7.4-alpine
+          # requirepass is read from the mounted Secret rather than passed as
+          # an arg, so the password never shows up in `kubectl get pod -o yaml`
+          # or in the container's own /proc/1/cmdline.
+          command:
+            - sh
+            - -c
+            - >-
+              exec redis-server
+              --appendonly yes
+              --dir /data
+              --requirepass "$(cat /secrets/redis-password)"
+          ports:
+            - name: redis
+              containerPort: 6379
+          livenessProbe:
+            exec:
+              command:
+                - sh
+                - -c
+                - redis-cli -a "$(cat /secrets/redis-password)" --no-auth-warning ping
+            initialDelaySeconds: 10
+            periodSeconds: 15
+            timeoutSeconds: 3
+          readinessProbe:
+            exec:
+              command:
+                - sh
+                - -c
+                - redis-cli -a "$(cat /secrets/redis-password)" --no-auth-warning ping
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 3
+          resources:
+            requests:
+              cpu: 25m
+              memory: 32Mi
+            limits:
+              memory: 128Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+          volumeMounts:
+            - name: secrets
+              mountPath: /secrets
+              readOnly: true
+            - name: data
+              mountPath: /data
+      volumes:
+        - name: secrets
+          secret:
+            secretName: authelia-secret
+            defaultMode: 0400
+            items:
+              - key: redis-password
+                path: redis-password
+        - name: data
+          persistentVolumeClaim:
+            claimName: eoapi-dev-authelia-redis-data

@@ -568,6 +568,26 @@
           "type": "string",
           "description": "JS appended after stac-browser's own runtime-config.js is generated, to set fields with no SB_* equivalent (e.g. buildTileUrlTemplate)"
         },
+        "oidcClientId": {
+          "type": "string",
+          "description": "OAuth2 client ID the browser's own login presents"
+        },
+        "oidcDiscoveryUrl": {
+          "type": "string",
+          "description": "OIDC discovery URL for the browser's login; must be reachable from the user's browser. Required when stac-auth-proxy is enabled"
+        },
+        "oidcScope": {
+          "type": "string",
+          "description": "OIDC scope the browser requests, space-separated. Must match what the provider grants this client or the whole authorization request is rejected"
+        },
+        "oidcLogoutUrl": {
+          "type": "string",
+          "description": "Where 'Log out' ends the identity provider session, for providers advertising no end_session_endpoint (e.g. Authelia). Empty for providers that do"
+        },
+        "authConfig": {
+          "type": "object",
+          "description": "Full override of the SB_authConfig document the chart otherwise builds from browser.oidc*. Set this only to reach an oidc-client-ts setting the oidc* values do not expose"
+        },
         "favicon": {
           "type": "string",
           "description": "Base64-encoded PNG content for a custom favicon, linked into index.html's <head>"
