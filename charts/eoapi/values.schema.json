@@ -603,6 +603,222 @@
         }
       }
     },
+    "narthex-backend": {
+      "type": "object",
+      "description": "narthex-backend: named STAC item lists API (fork-only; see deploy/cscs)",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "description": "Enable narthex-backend"
+        },
+        "image": {
+          "$ref": "#/definitions/containerImage"
+        },
+        "service": {
+          "type": "object",
+          "properties": {
+            "port": {
+              "type": "integer",
+              "description": "Service port"
+            }
+          }
+        },
+        "ingress": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "description": "Enable a chart-managed Ingress for this service"
+            },
+            "path": {
+              "type": "string",
+              "description": "Ingress path prefix for this service"
+            }
+          }
+        },
+        "authMode": {
+          "type": "string",
+          "enum": [
+            "",
+            "dev",
+            "oidc"
+          ],
+          "description": "How the API authenticates callers: 'dev' takes any bearer token as the owner id, 'oidc' validates a JWT against oidcIssuer's JWKS. Empty falls back to the image's own default"
+        },
+        "oidcIssuer": {
+          "type": "string",
+          "description": "OIDC issuer URL whose JWKS validates bearer tokens. Required when authMode is 'oidc'"
+        },
+        "oidcAudiences": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Accepted 'aud' values. Must include every client whose token reaches this API - the narthex SPA and the stac-browser widget are separate clients"
+        },
+        "corsOrigins": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Browser origins allowed to call this API. The SaveToNarthex widget calls it from the stac-browser origin, not narthex's own"
+        },
+        "launchTokenSecretName": {
+          "type": "string",
+          "description": "Secret holding the token used to sign notebook launch handoffs"
+        },
+        "imagePullSecrets": {
+          "type": "array",
+          "description": "imagePullSecrets for a private registry; narthex images are published privately",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "settings": {
+          "type": "object",
+          "properties": {
+            "resources": {
+              "type": "object",
+              "description": "Resource requests and limits for this service"
+            }
+          }
+        }
+      }
+    },
+    "narthex-frontend": {
+      "type": "object",
+      "description": "narthex-frontend: the named-list admin SPA (fork-only; see deploy/cscs)",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "description": "Enable narthex-frontend"
+        },
+        "image": {
+          "$ref": "#/definitions/containerImage"
+        },
+        "service": {
+          "type": "object",
+          "properties": {
+            "port": {
+              "type": "integer",
+              "description": "Service port"
+            }
+          }
+        },
+        "ingress": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "description": "Enable a chart-managed Ingress for this service"
+            },
+            "path": {
+              "type": "string",
+              "description": "Ingress path prefix for this service"
+            }
+          }
+        },
+        "apiUrl": {
+          "type": "string",
+          "description": "Externally reachable narthex-backend URL; the SPA calls it from the browser"
+        },
+        "authMode": {
+          "type": "string",
+          "enum": [
+            "",
+            "dev",
+            "oidc",
+            "proxy"
+          ],
+          "description": "'dev' prompts for a username, 'oidc' runs the SPA's own OIDC client, 'proxy' expects an upstream proxy to inject the token. Empty lets narthex infer it (oidc when oidcIssuer is set, otherwise dev)"
+        },
+        "logoutUrl": {
+          "type": "string",
+          "description": "Where 'Sign out' ends the provider session. Required for providers advertising no end_session_endpoint (e.g. Authelia), or logout only clears local state"
+        },
+        "oidcIssuer": {
+          "type": "string",
+          "description": "OIDC issuer URL. Required when authMode is 'oidc'"
+        },
+        "oidcClientId": {
+          "type": "string",
+          "description": "OAuth2 client ID the SPA presents"
+        },
+        "oidcRedirectUri": {
+          "type": "string",
+          "description": "Must exactly match a redirect URI registered for oidcClientId with the provider"
+        },
+        "oidcScope": {
+          "type": "string",
+          "description": "Space-separated OIDC scopes; empty uses narthex's own default. Must match what the provider grants this client or the whole authorization request is rejected"
+        },
+        "launchConfigs": {
+          "type": "array",
+          "description": "JupyterHub launch targets offered by the SPA. An empty list means none are offered - it is never a fallback to narthex's built-in dev defaults",
+          "items": {
+            "type": "object",
+            "required": [
+              "id",
+              "label",
+              "jupyterHubUrl"
+            ],
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "label": {
+                "type": "string"
+              },
+              "jupyterHubUrl": {
+                "type": "string"
+              },
+              "notebookApp": {
+                "type": "string"
+              },
+              "uenv": {
+                "type": "string"
+              },
+              "venv": {
+                "type": "string"
+              },
+              "notebook": {
+                "type": "string"
+              },
+              "message": {
+                "type": "string",
+                "description": "Plain text shown in an acknowledgement modal before launching; never rendered as HTML"
+              }
+            }
+          }
+        },
+        "imagePullSecrets": {
+          "type": "array",
+          "description": "imagePullSecrets for a private registry; narthex images are published privately",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "settings": {
+          "type": "object",
+          "properties": {
+            "resources": {
+              "type": "object",
+              "description": "Resource requests and limits for this service"
+            }
+          }
+        }
+      }
+    },
     "docServer": {
       "type": "object",
       "properties": {
