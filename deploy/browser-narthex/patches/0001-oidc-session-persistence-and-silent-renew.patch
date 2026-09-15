@@ -1,5 +1,5 @@
 diff --git a/src/auth/oidc.js b/src/auth/oidc.js
-index a1fb696..0b3aebd 100644
+index a1fb696..11777f4 100644
 --- a/src/auth/oidc.js
 +++ b/src/auth/oidc.js
 @@ -1,6 +1,6 @@
@@ -57,7 +57,7 @@ index a1fb696..0b3aebd 100644
 +      }
 +    }
 +
-+    if (!user) {
++    if (!user && this.canSigninSilently()) {
 +      // Nothing stored here, but the provider may still have a session: after
 +      // a logout and a fresh sign-in there, or on a first visit in a browser
 +      // that is already signed in elsewhere. Without this the Browser shows
@@ -74,7 +74,27 @@ index a1fb696..0b3aebd 100644
      }
  
      if (user && !user.expired) {
-@@ -52,6 +91,15 @@ export default class OIDC extends Auth {
+@@ -35,6 +74,19 @@ export default class OIDC extends Auth {
+     return false;
+   }
+ 
++  // A silent sign-in must not run while another sign-in is being completed.
++  // On the callback route it would race confirmLogin() for the stored state
++  // and leave the redirect stranded on /auth?code=..., and inside the renewal
++  // iframe - which loads this same app - it would start a second silent
++  // sign-in within the first.
++  canSigninSilently() {
++    if (window.self !== window.top) {
++      return false;
++    }
++    const params = new URLSearchParams(window.location.search);
++    return !params.has('code') && !params.has('error');
++  }
++
+   getRedirectUri(appPath) {
+     const path = this.router.resolve(appPath).href;
+     return window.location.origin + path;
+@@ -52,6 +104,15 @@ export default class OIDC extends Auth {
    }
  
    async confirmLogin() {
@@ -90,7 +110,7 @@ index a1fb696..0b3aebd 100644
      const user = await this.manager.signinRedirectCallback();
      await this.setUser(user);
      this.restoreOriginalUri();
-@@ -59,7 +107,17 @@ export default class OIDC extends Auth {
+@@ -59,7 +120,17 @@ export default class OIDC extends Auth {
  
    async logout(credentials) {
      await super.logout(credentials);
