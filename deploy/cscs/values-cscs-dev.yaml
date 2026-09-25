@@ -211,10 +211,6 @@ narthex-frontend:
       uenv: eobs-lab     # name part must match `uenv status` output
       venv: /user-environment/venv
       notebook: stac-sim-viewer
-      # ncPath is templated from the launched STAC item's sim:path property
-      # and forwarded to the launcher as &nc_path=... so the notebook lands
-      # with NC_PATH already pointing at the right file on Santis.
-      ncPath: "{{item.properties['sim:path']}}"
       message: |
         You will be taken to the Santis JupyterHub next. On that page you
         need to select "eobs-lab" as the uenv and "lab" as the view.
