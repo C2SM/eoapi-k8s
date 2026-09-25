@@ -12,5 +12,9 @@ data:
   # container's own entrypoint (narthex frontend/docker-entrypoint.d/) - see
   # deployment.yaml.
   launch-configs.yaml: |
-    {{- toYaml ($nf.launchConfigs | default list) | nindent 4 }}
+    {{- if $nf.launchConfigs }}
+    {{- toYaml $nf.launchConfigs | nindent 4 }}
+    {{- else }}
+    []
+    {{- end }}
 {{- end }}
