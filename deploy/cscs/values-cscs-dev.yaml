@@ -208,16 +208,9 @@ narthex-frontend:
       label: Santis STAC Sim Viewer
       jupyterHubUrl: https://jupyter-santis.cscs.ch
       notebookApp: narthex-launch
-      uenv: eobs-lab     # name part must match `uenv status` output
-      venv: /user-environment/venv
+      uenv: eobs-lab
+      venv: /user-environment/venv        # ← wrong
       notebook: stac-sim-viewer
-      message: |
-        You will be taken to the Santis JupyterHub next. On that page you
-        need to select "eobs-lab" as the uenv and "lab" as the view.
-
-        If you plan to access grimsel data, that is currently only possible
-        via the "es-data" reservation, which you have to specify under
-        advanced options on that same launch page.
 
     - id: "santis-test-notebook"
       label: "Santis Test Notebook"
