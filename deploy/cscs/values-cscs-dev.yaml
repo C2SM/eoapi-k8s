@@ -189,7 +189,7 @@ narthex-frontend:
       jupyterHubUrl: https://jupyter-santis.cscs.ch
       notebookApp: narthex-launch
       uenv: eobs-lab     # name part must match `uenv status` output
-      venv: /user-environment/venv
+      venv: narthex-named-list-viewer
       notebook: named-list-viewer
       # Shown in an acknowledgement modal before the launch proceeds. Neither
       # choice below can be made for the user from here - the uenv and the
@@ -203,6 +203,14 @@ narthex-frontend:
         If you plan to access grimsel data, that is currently only possible
         via the "es-data" reservation, which you have to specify under
         advanced options on that same launch page.
+
+    - id: santis-stac-sim-viewer
+      label: Santis STAC Sim Viewer
+      jupyterHubUrl: https://jupyter-santis.cscs.ch
+      notebookApp: narthex-launch
+      uenv: eobs-lab
+      venv: narthex-stac-sim-viewer
+      notebook: stac-sim-viewer
 
     - id: "santis-test-notebook"
       label: "Santis Test Notebook"

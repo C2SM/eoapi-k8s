@@ -2,6 +2,7 @@ suite: narthex auth mode tests
 templates:
   - templates/_helpers/core.tpl
   - templates/_helpers/database.tpl
+  - templates/services/narthex-frontend/configmap.yaml
   - templates/services/narthex-frontend/deployment.yaml
   - templates/services/narthex-backend/deployment.yaml
 tests:
