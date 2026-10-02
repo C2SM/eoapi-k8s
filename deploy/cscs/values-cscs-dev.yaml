@@ -185,7 +185,7 @@ narthex-frontend:
   # never falls back to it itself.
   launchConfigs:
     - id: santis-launcher
-      label: Santis Launcher
+      label: Santis Earth Data Launcher
       jupyterHubUrl: https://jupyter-santis.cscs.ch
       notebookApp: narthex-launch
       uenv: eobs-lab     # name part must match `uenv status` output
