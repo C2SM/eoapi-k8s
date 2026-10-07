@@ -1,0 +1,67 @@
+# oauth2-proxy as the ForwardAuth gate for what has no auth of its own on the
+# eoAPI host: /raster, /vector, /multidim and the / doc server. Keycloak has
+# no ForwardAuth endpoint, so this is the piece that replaces Authelia's.
+#
+# The confidential prometheus-tds client: client_secret and cookie_secret come
+# from the oauth2-proxy-keycloak-secret Secret as env vars (see
+# oauth2-proxy-deployment.yaml); everything else is here.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: eoapi-dev-oauth2-proxy-config
+  namespace: eoapi-dev
+  labels:
+    app.kubernetes.io/name: oauth2-proxy
+    app.kubernetes.io/part-of: eoapi-dev-auth-keycloak
+data:
+  oauth2-proxy.cfg: |
+    http_address = "0.0.0.0:4180"
+    provider = "keycloak-oidc"
+    provider_display_name = "CSCS"
+    oidc_issuer_url = "https://auth.cscs.ch/auth/realms/cscs"
+    client_id = "prometheus-tds"
+    redirect_url = "https://prometheus-dev.c2sm-tds.c2sm.cscs.ch/oauth2/callback"
+    proxy_prefix = "/oauth2"
+    skip_provider_button = true
+    code_challenge_method = "S256"
+    # The default, "force", is sent as approval_prompt=force on every login.
+    approval_prompt = "auto"
+    scope = "openid email profile"
+
+    # Any CSCS user may sign in; which ones get through the gate is decided by
+    # `allowed_groups` on the middleware address (oauth2-proxy-middleware.yaml).
+    # Checked here instead, a refused user would be logged without their
+    # groups; checked there, every login is logged with them first.
+    email_domains = ["*"]
+    # Emails were unverified on the TDS realm, which oauth2-proxy otherwise
+    # rejects outright. Nothing here authorizes by email - only by role.
+    insecure_oidc_allow_unverified_email = true
+
+    # /stac authenticates itself (stac-auth-proxy) and /browser is public
+    # static UI; gating either kills anonymous access to public collections.
+    # Matched against X-Forwarded-Uri, which the middleware sets from the real
+    # request - see trustForwardHeader in oauth2-proxy-middleware.yaml.
+    skip_auth_routes = ["^/(stac|browser)(/|$)"]
+
+    # The middleware calls `/`, not `/oauth2/auth`: the proxy handler answers
+    # an anonymous browser with the login redirect itself (and AJAX with a JSON
+    # 401), so no Traefik `errors` middleware is needed - one would also
+    # rewrite stac-auth-proxy's JSON 401s on /stac into HTML redirects.
+    upstreams = ["static://202"]
+    reverse_proxy = true
+    # Log the browser's address, not Traefik's.
+    real_client_ip_header = "X-Forwarded-For"
+
+    cookie_name = "__Secure-eoapi-dev-oauth2"
+    cookie_secure = true
+    cookie_samesite = "lax"
+    cookie_domains = ["prometheus-dev.c2sm-tds.c2sm.cscs.ch"]
+    # The post-login redirect is the absolute URL of the original request.
+    whitelist_domains = ["prometheus-dev.c2sm-tds.c2sm.cscs.ch"]
+    # A session is invalid once its access token expires, and the TDS realm's
+    # access tokens lived 300s - check prod's with inspect-claims.py.
+    # Refreshing also ends the gate's session once the SSO session has ended.
+    cookie_refresh = "4m"
+    # A page of map tiles starts one login flow per tile; a shared CSRF
+    # cookie would let them overwrite each other.
+    cookie_csrf_per_request = true

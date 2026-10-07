@@ -3,11 +3,16 @@
 Access is granted per collection, by the `auth:groups` list on the collection
 itself. Items carry none of their own: an item is readable exactly when its
 parent collection is.
+
+A caller's roles are the CSCS Keycloak role names in its token, wherever the
+realm puts them: the `groups` claim, realm roles, or roles on the client the
+token was issued to (`azp`). Every decision is logged with them.
 """
 
 import asyncio
 import dataclasses
 import json
+import logging
 import os
 import re
 import time
@@ -18,10 +23,20 @@ from urllib.request import Request, urlopen
 
 from fastapi import HTTPException
 
-ADMIN_GROUP = "/eoapi-admin"
+logger = logging.getLogger(__name__)
+
+# Unfiltered.
+ADMIN_GROUP = "prometheus_all"
 # auth:groups value that grants everyone, authenticated or not.
 PUBLIC = "public"
-GROUPS = {"/eoapi-noaa": "noaa", "/nasa-users": "nasa", "/dyamond-users": "dyamond"}
+# Both spellings CSCS listed for each role grant the same collections. No role
+# maps to "noaa" yet, so noaa-only collections are readable by ADMIN_GROUP only.
+GROUPS = {
+    "prometheus_nasa": "nasa",
+    "prometheus_tds_nasa": "nasa",
+    "prometheus_dyanamo": "dyamond",
+    "prometheus_tds_dynamo": "dyamond",
+}
 CACHE_TTL = 60
 PAGE = 1000
 UPSTREAM = os.environ.get("UPSTREAM_URL", "").rstrip("/")
@@ -38,14 +53,35 @@ CATALOG_COLLECTION = re.compile(
 _cache: dict[str, tuple[float, Any]] = {}
 
 
-def _readable(context: dict[str, Any]) -> list[str] | None:
-    """auth:groups values this caller may read. None means unrestricted."""
-    groups = (context.get("payload") or {}).get("groups") or []
+def _roles(payload: dict[str, Any]) -> set[str]:
+    """Role names in the token, wherever the realm put them."""
+    groups = payload.get("groups") or []
     if isinstance(groups, str):
         groups = groups.replace(",", " ").split()
-    if ADMIN_GROUP in groups:
-        return None
-    return [value for group, value in GROUPS.items() if group in groups] + [PUBLIC]
+    client = (payload.get("resource_access") or {}).get(payload.get("azp")) or {}
+    return {
+        *groups,
+        *(payload.get("realm_access") or {}).get("roles", []),
+        *client.get("roles", []),
+    }
+
+
+def _readable(context: dict[str, Any]) -> list[str] | None:
+    """auth:groups values this caller may read. None means unrestricted."""
+    payload = context.get("payload") or {}
+    roles = _roles(payload)
+    if ADMIN_GROUP in roles:
+        values = None
+    else:
+        values = sorted({value for group, value in GROUPS.items() if group in roles})
+        values.append(PUBLIC)
+    logger.info(
+        "user=%s roles=%s readable=%s",
+        payload.get("preferred_username") or payload.get("sub") or "-",
+        sorted(roles),
+        "all" if values is None else values,
+    )
+    return values
 
 
 def _expr(values: list[str]) -> dict[str, Any]:

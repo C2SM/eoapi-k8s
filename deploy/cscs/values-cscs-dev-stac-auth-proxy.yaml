@@ -11,13 +11,8 @@ stac-auth-proxy:
         enabled: false
     env:
         UPSTREAM_URL: "http://eoapi-stac:8080"
-        OIDC_DISCOVERY_URL: "https://auth-prometheus-dev.c2sm-tds.c2sm.cscs.ch/.well-known/openid-configuration"
-        OIDC_DISCOVERY_INTERNAL_URL: "https://auth-prometheus-dev.c2sm-tds.c2sm.cscs.ch/.well-known/openid-configuration"
-        # Only stac-browser's own access token reaches /stac; nothing injects
-        # an Authorization header here. This is an ACCESS token audience, which
-        # requires the client's access_token_signed_response_alg +
-        # requested_audience_mode settings in authelia-configmap.yaml.
-        ALLOWED_JWT_AUDIENCES: "stac-browser"
+        # OIDC_DISCOVERY_* and ALLOWED_JWT_AUDIENCES are set in
+        # values-cscs-dev-auth-keycloak.yaml.
         ROOT_PATH: "/stac"
         ROOT_PATH_SKIP_PREFIXES: "/raster,/vector,/browser,/multidim"
         OVERRIDE_HOST: "false"

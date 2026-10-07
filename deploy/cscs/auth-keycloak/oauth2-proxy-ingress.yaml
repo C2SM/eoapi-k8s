@@ -1,0 +1,40 @@
+# oauth2-proxy's own endpoints (/oauth2/start, /oauth2/callback,
+# /oauth2/sign_out) on the eoAPI host - the only host it gates.
+#
+# Only the IP allowlist here: the ForwardAuth middleware on the very endpoints
+# that perform the login would be a redirect loop. No cert-manager annotation:
+# the chart's Ingress owns the shared eoapi-dev-tls secret, and two owners make
+# cert-manager race itself over it.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: eoapi-dev-oauth2-proxy
+  namespace: eoapi-dev
+  labels:
+    app.kubernetes.io/name: oauth2-proxy
+    app.kubernetes.io/part-of: eoapi-dev-auth-keycloak
+  annotations:
+    traefik.ingress.kubernetes.io/router.entrypoints: "websecure"
+    traefik.ingress.kubernetes.io/router.tls: "true"
+    traefik.ingress.kubernetes.io/router.middlewares: "eoapi-dev-eoapi-dev-ipallowlist@kubernetescrd"
+    # Pinned rather than left to longest-rule-wins, which was observed not to
+    # reliably prefer the more specific path across resources; otherwise
+    # /oauth2 can fall through to the chart's / route and its gate.
+    traefik.ingress.kubernetes.io/router.priority: "1000"
+spec:
+  ingressClassName: traefik
+  rules:
+    - host: prometheus-dev.c2sm-tds.c2sm.cscs.ch
+      http:
+        paths:
+          - path: /oauth2
+            pathType: Prefix
+            backend:
+              service:
+                name: eoapi-dev-oauth2-proxy
+                port:
+                  number: 4180
+  tls:
+    - hosts:
+        - prometheus-dev.c2sm-tds.c2sm.cscs.ch
+      secretName: eoapi-dev-tls
