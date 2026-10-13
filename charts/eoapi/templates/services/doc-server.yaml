@@ -1,0 +1,96 @@
+{{- if .Values.docServer.enabled}}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-doc-server-html
+data:
+  index.html: |
+    {{- if .Values.docServer.customHtml }}
+    {{- .Values.docServer.customHtml | nindent 4 }}
+    {{- else if .Values.docServer.redirectTo }}
+    <html>
+    <head>
+        <meta http-equiv="refresh" content="0; url={{ .Values.docServer.redirectTo }}" />
+    </head>
+    <body>
+        <p>Redirecting to <a href="{{ .Values.docServer.redirectTo }}">{{ .Values.docServer.redirectTo }}</a></p>
+    </body>
+    </html>
+    {{- else }}
+    <html>
+    <head>
+        <title>eoAPI</title>
+    </head>
+    <body>
+        <h2>This is the root path /</h2>
+        <p>Your service configuration is using path rewrites. So use these paths for each service:</p>
+        <ul>
+          <li><a href="/raster" target="_blank" rel="noopener noreferrer">/raster</a></li>
+          <li><a href="/vector" target="_blank" rel="noopener noreferrer">/vector</a></li>
+          <li><a href="/stac" target="_blank" rel="noopener noreferrer">/stac</a></li>
+          {{- if .Values.multidim.enabled }}
+          <li><a href="/multidim" target="_blank" rel="noopener noreferrer">/multidim</a></li>
+          {{- end}}
+          <li><a href="/browser/" target="_blank" rel="noopener noreferrer">/browser</a></li>
+        </ul>
+    </body>
+    </html>
+    {{- end }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-doc-server
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: {{ .Release.Name }}-doc-server
+  template:
+    metadata:
+      labels:
+        app: {{ .Release.Name }}-doc-server
+    spec:
+      containers:
+      - name: doc-server
+        image: {{ include "eoapi.containerImage" .Values.docServer.image }}
+        imagePullPolicy: {{ .Values.docServer.image.pullPolicy | default "IfNotPresent" }}
+        volumeMounts:
+        - name: {{ .Release.Name }}-doc-html
+          mountPath: /usr/share/nginx/html
+        ports:
+        - containerPort: 8080
+        {{- if .Values.docServer.settings }}
+        {{- with .Values.docServer.settings.resources }}
+        resources:
+          {{- toYaml . | nindent 10 }}
+        {{- end }}
+        {{- end }}
+      volumes:
+      - name: {{ .Release.Name }}-doc-html
+        configMap:
+          name: {{ .Release.Name }}-doc-server-html
+      {{- if .Values.docServer.settings }}
+      {{- with .Values.docServer.settings.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.docServer.settings.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- end }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}-doc-server
+spec:
+  selector:
+    app: {{ .Release.Name }}-doc-server
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 8080
+---
+{{- end }}

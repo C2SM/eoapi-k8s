@@ -1,0 +1,85 @@
+suite: vector service tests
+templates:
+  - templates/_helpers/core.tpl
+  - templates/_helpers/database.tpl
+  - templates/_helpers/services.tpl
+  - templates/services/vector/deployment.yaml
+  - templates/services/vector/configmap.yaml
+  - templates/services/vector/service.yaml
+  - templates/services/vector/hpa.yaml
+tests:
+  - it: "vector deployment defaults"
+    set:
+      raster.enabled: false
+      stac.enabled: false
+      vector.enabled: true
+      multidim.enabled: false
+
+    template: templates/services/vector/deployment.yaml
+    asserts:
+      - isKind:
+          of: Deployment
+      - matchRegex:
+          path: metadata.name
+          pattern: ^RELEASE-NAME-vector$
+      - equal:
+          path: spec.strategy.type
+          value: "RollingUpdate"
+
+  - it: "vector deployment includes configmap checksum annotation"
+    set:
+      vector.enabled: true
+      stac.enabled: false
+      raster.enabled: false
+      multidim.enabled: false
+    template: templates/services/vector/deployment.yaml
+    asserts:
+      - exists:
+          path: spec.template.metadata.annotations["checksum/config"]
+      - matchRegex:
+          path: spec.template.metadata.annotations["checksum/config"]
+          pattern: ^[a-f0-9]{64}$
+
+  - it: "vector configmap defaults"
+    set:
+      raster.enabled: false
+      stac.enabled: false
+      vector.enabled: true
+      multidim.enabled: false
+    template: templates/services/vector/configmap.yaml
+    asserts:
+      - isKind:
+          of: ConfigMap
+      - matchRegex:
+          path: metadata.name
+          pattern: ^RELEASE-NAME-vector-envvar-configmap$
+      - equal:
+          path: data.TIPG_CATALOG_TTL
+          value: "300"
+
+  - it: "vector browser service"
+    set:
+      raster.enabled: false
+      stac.enabled: false
+      vector.enabled: true
+      multidim.enabled: false
+      browser.enabled: false
+      vector.annotations:
+        annotation1: hello
+        annotation2: world
+    template: templates/services/vector/service.yaml
+    asserts:
+      - isKind:
+          of: Service
+      - matchRegex:
+          path: metadata.name
+          pattern: ^RELEASE-NAME-vector$
+      - matchRegex:
+          path: metadata.labels.app
+          pattern: ^RELEASE-NAME-vector$
+      - equal:
+          path: metadata.annotations.annotation1
+          value: hello
+      - equal:
+          path: metadata.annotations.annotation2
+          value: world

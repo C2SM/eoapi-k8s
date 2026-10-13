@@ -1,0 +1,105 @@
+{{- if .Values.pgstacBootstrap.enabled }}
+---
+# These ConfigMaps provide the necessary data and scripts for the pgstacbootstrap job.
+# They use Helm hooks with a weight of "-6" (lower than the job's "-5") to ensure
+# they are created before the job that depends on them.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-pgstac-settings-config
+  {{- with .Values.pgstacBootstrap.configMaps.pgstacSettings.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+data:
+  pgstac-settings.sql: |
+    {{- tpl (.Files.Get "data/initdb/settings/pgstac-settings.sql.tpl") . | nindent 4 }}
+    {{- if (index .Values "eoapi-notifier").enabled }}
+    {{ .Files.Get "data/initdb/settings/pgstac-notification-triggers.sql" | nindent 4 }}
+    {{- end }}
+---
+{{- if .Values.pgstacBootstrap.settings.loadSamples }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-initdb-sql-config
+  {{- with .Values.pgstacBootstrap.configMaps.initdbSql.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+data:
+  initdb.sql: |
+    {{- range $path, $bytes := $.Files.Glob "data/initdb/samples/*.sql"  -}}
+    {{ $.Files.Get $path | nindent 4 }}
+    {{- end }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-initdb-json-config
+  {{- with .Values.pgstacBootstrap.configMaps.initdbJson.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+data:
+  {{- range $path, $bytes := $.Files.Glob "data/initdb/samples/*.json"  -}}
+  {{- base $path | nindent 2 -}}: | {{- $.Files.Get $path | nindent 4 -}}
+  {{- end }}
+{{- end }}
+---
+{{- if .Values.pgstacBootstrap.settings.queryables }}
+{{- $hasFileBasedQueryables := false }}
+{{- range $config := .Values.pgstacBootstrap.settings.queryables }}
+  {{- if and $config.file (typeIs "string" $config.file) }}
+    {{- $hasFileBasedQueryables = true }}
+  {{- end }}
+{{- end }}
+{{- if $hasFileBasedQueryables }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-pgstac-queryables-config
+  {{- with .Values.pgstacBootstrap.configMaps.pgstacQueryables.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+data:
+  {{- range $config := .Values.pgstacBootstrap.settings.queryables }}
+  {{- if and $config.file (typeIs "string" $config.file) }}
+  {{ $config.name }}: |
+    {{- $.Files.Get $config.file | nindent 4 }}
+  {{- end }}
+  {{- end }}
+{{- end }}
+{{- end }}
+{{- end }}
+---
+{{- if .Values.postgrescluster.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-initdb
+  {{- with .Values.pgstacBootstrap.configMaps.initdb.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+data:
+  initdb.sql: |
+    \c {{ .Values.pgstacBootstrap.settings.database }}
+    CREATE EXTENSION IF NOT EXISTS postgis;
+    CREATE EXTENSION IF NOT EXISTS btree_gist;
+    CREATE EXTENSION IF NOT EXISTS unaccent;
+    CREATE ROLE pgstac_admin;
+    CREATE ROLE pgstac_read;
+    CREATE ROLE pgstac_ingest;
+    ALTER DATABASE {{ .Values.pgstacBootstrap.settings.database }} OWNER TO {{ .Values.pgstacBootstrap.settings.user }};
+    ALTER USER {{ .Values.pgstacBootstrap.settings.user }} SET search_path TO pgstac, public;
+    ALTER ROLE {{ .Values.pgstacBootstrap.settings.user }} WITH CREATEROLE;
+    ALTER DATABASE {{ .Values.pgstacBootstrap.settings.database }} set search_path to pgstac, public;
+    GRANT CONNECT ON DATABASE {{ .Values.pgstacBootstrap.settings.database }} TO {{ .Values.pgstacBootstrap.settings.user }};
+    GRANT ALL PRIVILEGES ON TABLES TO {{ .Values.pgstacBootstrap.settings.user }};
+    GRANT ALL PRIVILEGES ON SEQUENCES TO {{ .Values.pgstacBootstrap.settings.user }};
+    GRANT pgstac_read TO {{ .Values.pgstacBootstrap.settings.user }} WITH ADMIN OPTION;
+    GRANT pgstac_ingest TO {{ .Values.pgstacBootstrap.settings.user }} WITH ADMIN OPTION;
+    GRANT pgstac_admin TO {{ .Values.pgstacBootstrap.settings.user }} WITH ADMIN OPTION;
+{{- end }}

@@ -1,0 +1,30 @@
+dependencies:
+- name: postgrescluster
+  repository: https://devseed.com/eoapi-k8s/
+  version: 5.8.6
+- name: postgrescluster
+  repository: https://devseed.com/eoapi-k8s/
+  version: 5.8.6
+- name: eoapi-notifier
+  repository: oci://ghcr.io/developmentseed/charts
+  version: 0.1.0
+- name: knative-operator
+  repository: https://knative.github.io/operator
+  version: v1.23.1
+- name: metrics-server
+  repository: https://kubernetes-sigs.github.io/metrics-server/
+  version: 3.14.0
+- name: prometheus
+  repository: https://prometheus-community.github.io/helm-charts
+  version: 29.27.0
+- name: prometheus-adapter
+  repository: https://prometheus-community.github.io/helm-charts
+  version: 5.3.0
+- name: grafana
+  repository: https://grafana.github.io/helm-charts
+  version: 10.5.15
+- name: stac-auth-proxy
+  repository: oci://ghcr.io/developmentseed/stac-auth-proxy/charts
+  version: 1.2.0
+digest: sha256:c332f2da6441a9f6d9af641e3fab96adf2e318adea12fb0639acba8e1696192c
+generated: "2026-09-04T12:16:44.694965021+02:00"

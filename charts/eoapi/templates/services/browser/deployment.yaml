@@ -1,0 +1,115 @@
+{{- if .Values.browser.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-browser
+  labels:
+    app: {{ .Release.Name }}-browser
+    gitsha: {{ include "eoapi.gitSha" . }}
+spec:
+  replicas: {{ .Values.browser.replicaCount | default 1 }}
+  selector:
+    matchLabels:
+      app: {{ .Release.Name }}-browser
+  template:
+    metadata:
+      {{- if include "eoapi.browserConfigMapEnabled" . }}
+      annotations:
+        checksum/browser-config: {{ include (print $.Template.BasePath "/services/browser/configmap.yaml") . | sha256sum }}
+      {{- end }}
+      labels:
+        app: {{ .Release.Name }}-browser
+        {{- with .Values.browser.settings.labels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      {{- with .Values.browser.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: browser
+          image: {{ include "eoapi.containerImage" .Values.browser.image }}
+          imagePullPolicy: {{ .Values.browser.image.pullPolicy | default "IfNotPresent" }}
+          ports:
+          - containerPort: 8080
+          env:
+            {{- $browserPath := include "eoapi.browserIngressPath" . }}
+            - name: SB_pathPrefix
+              value: {{ ternary "/" (printf "%s/" $browserPath) (eq $browserPath "/") | quote }}
+            - name: SB_catalogUrl
+              value: {{ .Values.browser.catalogUrl | default (printf "%s://%s%s" (ternary "https" "http" .Values.ingress.tls.enabled) .Values.ingress.host .Values.stac.ingress.path) | quote }}
+            {{- if .Values.browser.catalogTitle }}
+            - name: SB_catalogTitle
+              value: {{ .Values.browser.catalogTitle | quote }}
+            {{- end }}
+            {{- if .Values.browser.catalogImage }}
+            - name: SB_catalogImage
+              value: {{ .Values.browser.catalogImage | quote }}
+            {{- end }}
+            {{- if index .Values "stac-auth-proxy" "enabled" }}
+            - name: SB_authConfig
+              {{- if .Values.browser.authConfig }}
+              value: {{ .Values.browser.authConfig | toJson | quote }}
+              {{- else }}
+              value: |-
+                {
+                  "type": "openIdConnect",
+                  "openIdConnectUrl": "{{ .Values.browser.oidcDiscoveryUrl }}",
+                  {{- if .Values.browser.oidcLogoutUrl }}
+                  "logoutUrl": "{{ .Values.browser.oidcLogoutUrl }}",
+                  {{- end }}
+                  {{- if .Values.browser.oidcAutoSignIn }}
+                  "autoSignIn": true,
+                  {{- end }}
+                  "oidcConfig": {
+                    "client_id": "{{ .Values.browser.oidcClientId | default "test-client" }}",
+                    "redirect_uri": "{{ if .Values.ingress.tls.enabled }}https{{ else }}http{{ end }}://{{ .Values.ingress.host }}{{ .Values.browser.ingress.path | default "/browser" | trimSuffix "/" }}/auth",
+                    "scope": "{{ .Values.browser.oidcScope | default "openid" }}"{{ if .Values.browser.oidcSilentRenew }},
+                    "silent_redirect_uri": "{{ if .Values.ingress.tls.enabled }}https{{ else }}http{{ end }}://{{ .Values.ingress.host }}{{ .Values.browser.ingress.path | default "/browser" | trimSuffix "/" }}/silent-renew.html"{{ end }}
+                  }
+                }
+              {{- end }}
+            {{- end }}
+            {{- if .Values.browser.footerLinks }}
+            - name: SB_footerLinks
+              value: {{ .Values.browser.footerLinks | toJson | trimPrefix "[" | trimSuffix "]" | quote }}
+            {{- end }}
+            {{- with .Values.browser.extraEnv }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          resources:
+          {{- toYaml .Values.browser.settings.resources | nindent 12 }}
+          {{- if include "eoapi.browserConfigMapEnabled" . }}
+          volumeMounts:
+            {{- if .Values.browser.customConfig }}
+            - name: browser-custom-config
+              mountPath: /etc/eoapi/browser/browser_config.js
+              subPath: browser_config.js
+              readOnly: true
+            {{- end }}
+            {{- if .Values.browser.favicon }}
+            - name: browser-custom-config
+              mountPath: /etc/eoapi/browser/favicon.png
+              subPath: favicon.png
+              readOnly: true
+            {{- end }}
+            {{- if .Values.browser.oidcSilentRenew }}
+            - name: browser-custom-config
+              mountPath: /etc/eoapi/browser/silent-renew.html
+              subPath: silent-renew.html
+              readOnly: true
+            {{- end }}
+            - name: browser-custom-config
+              mountPath: /docker-entrypoint.d/50-browser-custom-config.sh
+              subPath: 50-browser-custom-config.sh
+              readOnly: true
+          {{- end }}
+      {{- if include "eoapi.browserConfigMapEnabled" . }}
+      volumes:
+        - name: browser-custom-config
+          configMap:
+            name: {{ .Release.Name }}-browser-config
+            defaultMode: 0555
+      {{- end }}
+{{- end }}

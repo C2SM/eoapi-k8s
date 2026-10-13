@@ -1,0 +1,82 @@
+Thank you for installing {{ .Chart.Name }} {{ .Chart.Version }}
+
+Your eoAPI deployment is now being set up. This may take a few minutes.
+
+{{- if .Values.ingress.enabled }}
+
+You can access the services at:
+{{- if .Values.ingress.host }}
+  Host: {{ .Values.ingress.host }}
+{{- else }}
+  Get the host using:
+  $ kubectl get ingress -n {{ .Release.Namespace }}
+{{- end }}
+
+Available endpoints:
+{{- if has "stac" .Values.apiServices }}
+- STAC API:        {{ if .Values.ingress.host }}https://{{ .Values.ingress.host }}{{ end }}/stac
+{{- end }}
+{{- if has "raster" .Values.apiServices }}
+- Raster API:      {{ if .Values.ingress.host }}https://{{ .Values.ingress.host }}{{ end }}/raster
+{{- end }}
+{{- if has "vector" .Values.apiServices }}
+- Vector API:      {{ if .Values.ingress.host }}https://{{ .Values.ingress.host }}{{ end }}/vector
+{{- end }}
+{{- if has "multidim" .Values.apiServices }}
+- MultiDim API:    {{ if .Values.ingress.host }}https://{{ .Values.ingress.host }}{{ end }}/multidim
+{{- end }}
+{{- if .Values.browser.enabled }}
+- STAC Browser:    {{ if .Values.ingress.host }}https://{{ .Values.ingress.host }}{{ end }}/browser
+{{- end }}
+
+{{- else }}
+You have disabled the ingress. To access the services, you need to:
+1. Set up your own ingress controller, or
+2. Use port forwarding:
+
+{{- if has "stac" .Values.apiServices }}
+  $ kubectl port-forward -n {{ .Release.Namespace }} svc/stac 8080:{{ .Values.service.port }}
+{{- end }}
+{{- if has "raster" .Values.apiServices }}
+  $ kubectl port-forward -n {{ .Release.Namespace }} svc/raster 8081:{{ .Values.service.port }}
+{{- end }}
+{{- if has "vector" .Values.apiServices }}
+  $ kubectl port-forward -n {{ .Release.Namespace }} svc/vector 8082:{{ .Values.service.port }}
+{{- end }}
+{{- if has "multidim" .Values.apiServices }}
+  $ kubectl port-forward -n {{ .Release.Namespace }} svc/multidim 8083:{{ .Values.service.port }}
+{{- end }}
+{{- end }}
+
+{{- if not .Values.postgrescluster.enabled }}
+{{- $autoscaled := list }}
+{{- range $svc := (list "stac" "raster" "vector" "multidim") }}
+  {{- $cfg := index $.Values $svc }}
+  {{- if and $cfg $cfg.autoscaling $cfg.autoscaling.enabled }}
+    {{- $autoscaled = append $autoscaled $svc }}
+  {{- end }}
+{{- end }}
+{{- if $autoscaled }}
+
+WARNING: external/shared PostgreSQL + autoscaling
+  postgrescluster.enabled=false (the chart is NOT sizing this database) and autoscaling is
+  enabled on: {{ join ", " $autoscaled }}.
+
+  On a shared database the chart's default pool sizes can open hundreds of connections at the
+  HPA ceiling and exhaust max_connections. Confirm explicit WEB_CONCURRENCY and DB_MAX_CONN_SIZE
+  caps for each autoscaled service and budget them against your max_connections:
+    maxReplicas x WEB_CONCURRENCY x pools x DB_MAX_CONN_SIZE
+  STAC opens TWO pools (reader + writer) when ENABLE_TRANSACTIONS_EXTENSIONS=true.
+
+  See docs/autoscaling.md#external--shared-postgresql.
+{{- end }}
+{{- end }}
+
+To verify the deployment status:
+  $ kubectl get pods -n {{ .Release.Namespace }}
+
+For troubleshooting:
+  $ kubectl describe pods -n {{ .Release.Namespace }}
+  $ kubectl logs -n {{ .Release.Namespace }} -l app.kubernetes.io/name={{ .Chart.Name }}
+
+Visit https://github.com/developmentseed/eoapi-k8s for more information.

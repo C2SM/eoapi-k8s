@@ -1,0 +1,29 @@
+# ForwardAuth for the eoAPI host, referenced as
+# `eoapi-dev-eoapi-dev-oauth-forwardauth@kubernetescrd` from
+# values-cscs-dev-auth-keycloak.yaml.
+#
+# Calls oauth2-proxy's proxy handler at `/`, not `/oauth2/auth` - see
+# oauth2-proxy-configmap.yaml for why.
+#
+# `allowed_groups` on the address is the gate: a signed-in user holding none
+# of them gets a 403. Every CSCS prometheus_* role is listed in each form
+# oauth2-proxy's keycloak-oidc provider can hand it over in - a `groups` claim
+# value, `role:<realm role>`, `role:<client>:<client role>` - since which one
+# the realm uses is not yet known. The login log line shows the actual form.
+#
+# trustForwardHeader is deliberately false. oauth2-proxy matches its
+# skip_auth_routes against X-Forwarded-Uri, so a client-supplied
+# `X-Forwarded-Uri: /stac/` passed through here would open /raster to anyone.
+# False makes Traefik always set X-Forwarded-* from the real request.
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: eoapi-dev-oauth-forwardauth
+  namespace: eoapi-dev
+  labels:
+    app.kubernetes.io/name: oauth2-proxy
+    app.kubernetes.io/part-of: eoapi-dev-auth-keycloak
+spec:
+  forwardAuth:
+    address: "http://eoapi-dev-oauth2-proxy.eoapi-dev.svc.cluster.local:4180/?allowed_groups=prometheus_all,prometheus_nasa,prometheus_tds_nasa,prometheus_dyanamo,prometheus_tds_dynamo,role:prometheus_all,role:prometheus_nasa,role:prometheus_tds_nasa,role:prometheus_dyanamo,role:prometheus_tds_dynamo,role:prometheus-tds:prometheus_all,role:prometheus-tds:prometheus_nasa,role:prometheus-tds:prometheus_tds_nasa,role:prometheus-tds:prometheus_dyanamo,role:prometheus-tds:prometheus_tds_dynamo"
+    trustForwardHeader: false

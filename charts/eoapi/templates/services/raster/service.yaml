@@ -1,0 +1,20 @@
+{{- if .Values.raster.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}-raster
+  labels:
+    app: {{ .Release.Name }}-raster
+  {{- if .Values.raster.annotations }}
+  annotations:
+    {{- with .Values.raster.annotations }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+  {{- end }}
+spec:
+  ports:
+    - port: {{ .Values.service.port }}
+      targetPort: {{ .Values.service.port }}
+  selector:
+    app: {{ .Release.Name }}-raster
+{{- end }}

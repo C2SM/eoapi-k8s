@@ -1,0 +1,67 @@
+apiVersion: v2
+name: eoapi
+description: Create a full Earth Observation API with Metadata, Raster and Vector services
+type: application
+kubeVersion: '>=1.32.0-0'
+icon: https://eoapi.dev/img/eoAPI.png
+annotations:
+  artifacthub.io/changes: |
+    - Remove pathType and pathSuffix configurations
+    - Add upgrade job for pre-0.7.0 migrations
+    - Add separate browser ingress configuration
+    - Support custom PostgreSQL cluster naming
+  artifacthub.io/links: |
+    - name: GitHub Repository
+      url: https://github.com/developmentseed/eoapi-k8s
+    - name: Documentation
+      url: https://github.com/developmentseed/eoapi-k8s/tree/main/docs
+  artifacthub.io/maintainers: |
+    - name: DevelopmentSeed
+      email: eoapi@developmentseed.org
+  artifacthub.io/keywords: |
+    - earth observation
+    - geospatial
+    - kubernetes
+    - stac
+    - raster
+    - vector
+version: 0.15.2
+appVersion: 6.3.1
+dependencies:
+  - name: postgrescluster
+    version: 5.8.6
+    repository: https://devseed.com/eoapi-k8s/
+    condition: postgrescluster.enabled
+  - name: postgrescluster
+    alias: postgrescluster-narthex
+    version: 5.8.6
+    repository: https://devseed.com/eoapi-k8s/
+    condition: postgrescluster-narthex.enabled
+  - name: eoapi-notifier
+    version: 0.1.0
+    repository: oci://ghcr.io/developmentseed/charts
+    condition: eoapi-notifier.enabled
+  - name: knative-operator
+    version: v1.23.1
+    repository: https://knative.github.io/operator
+    condition: knative.enabled
+  - name: metrics-server
+    version: 3.14.0
+    repository: https://kubernetes-sigs.github.io/metrics-server/
+    condition: monitoring.metricsServer.enabled
+  - name: prometheus
+    version: 29.27.0
+    repository: https://prometheus-community.github.io/helm-charts
+    condition: monitoring.prometheus.enabled
+  - name: prometheus-adapter
+    version: 5.3.0
+    repository: https://prometheus-community.github.io/helm-charts
+    condition: monitoring.prometheusAdapter.enabled
+  - name: grafana
+    version: 10.5.15
+    repository: https://grafana.github.io/helm-charts
+    condition: observability.grafana.enabled
+  - name: stac-auth-proxy
+    version: 1.2.0
+    repository: oci://ghcr.io/developmentseed/stac-auth-proxy/charts
+    condition: stac-auth-proxy.enabled

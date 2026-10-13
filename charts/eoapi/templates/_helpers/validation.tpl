@@ -1,0 +1,86 @@
+{{/*
+values.schema.json doesn't play nice combined value checks
+so we use this helper function to check autoscaling rules
+*/}}
+{{- define "eoapi.validateAutoscaleRules" -}}
+{{- if and .Values.ingress.enabled (ne .Values.ingress.className "nginx") }}
+{{/* "requestRate" cannot be enabled for any service if not "nginx" so give feedback and fail */}}
+{{- $requestRateEnabled := false }}
+{{- range .Values.apiServices }}
+{{- if and (index $.Values . "autoscaling" "enabled") (eq (index $.Values . "autoscaling" "type") "requestRate") }}
+{{- $requestRateEnabled = true }}
+{{- end }}
+{{- end }}
+{{- if $requestRateEnabled }}
+{{- fail "When using an 'ingress.className' other than 'nginx' you cannot enable autoscaling by 'requestRate' at this time b/c it's solely an nginx metric" }}
+{{- end }}
+{{/* "both" cannot be enabled for any service if not "nginx" so give feedback and fail */}}
+{{- $bothEnabled := false }}
+{{- range .Values.apiServices }}
+{{- if and (index $.Values . "autoscaling" "enabled") (eq (index $.Values . "autoscaling" "type") "both") }}
+{{- $bothEnabled = true }}
+{{- end }}
+{{- end }}
+{{- if $bothEnabled }}
+{{- fail "When using an 'ingress.className' other than 'nginx' you cannot enable autoscaling by 'both' at this time b/c 'requestRate' is solely an nginx metric" }}
+{{- end }}
+{{- end }}
+{{- end -}}
+
+{{/*
+Ensure prometheus-adapter custom metric names match HPA request-rate metrics.
+*/}}
+{{- define "eoapi.validateHpaAdapterMetricAlignment" -}}
+{{- if .Values.monitoring.prometheusAdapter.enabled }}
+{{- $adapter := index .Values "prometheus-adapter" | default dict }}
+{{- $rules := list }}
+{{- if and $adapter.rules $adapter.rules.custom }}
+{{- $rules = $adapter.rules.custom }}
+{{- end }}
+{{- range .Values.apiServices }}
+{{- $service := . }}
+{{- $autoscaling := index $.Values $service "autoscaling" | default dict }}
+{{- if and $autoscaling.enabled (or (eq $autoscaling.type "requestRate") (eq $autoscaling.type "both")) }}
+{{- $expected := include "eoapi.hpaRequestRateMetricName" (dict "service" $service) | trim }}
+{{- $found := false }}
+{{- range $rules }}
+{{- if and .name .name.as (eq .name.as $expected) }}
+{{- $found = true }}
+{{- end }}
+{{- end }}
+{{- if not $found }}
+{{- fail (printf "prometheus-adapter.rules.custom must define name.as %q for request-rate HPA (service %q). See eoapi.hpaRequestRateMetricName in _helpers/services.tpl" $expected $service) }}
+{{- end }}
+{{- end }}
+{{- end }}
+{{- end }}
+{{- end -}}
+
+{{/*
+Validate stac-auth-proxy configuration
+Ensures OIDC_DISCOVERY_URL is set when stac-auth-proxy is enabled
+Ensures stac-auth-proxy cannot be enabled when stac is disabled
+*/}}
+{{- define "eoapi.validateStacAuthProxy" -}}
+{{- if index .Values "stac-auth-proxy" "enabled" }}
+{{- if not .Values.stac.enabled }}
+{{- fail "stac-auth-proxy cannot be enabled when stac.enabled is false. Enable stac first or disable stac-auth-proxy." }}
+{{- end }}
+{{- if not (index .Values "stac-auth-proxy" "env" "OIDC_DISCOVERY_URL") }}
+{{- fail "stac-auth-proxy.env.OIDC_DISCOVERY_URL is required when stac-auth-proxy is enabled. Set it to your OpenID Connect discovery URL (e.g., https://your-auth-server/.well-known/openid-configuration)" }}
+{{- end }}
+{{- end }}
+{{- end -}}
+
+{{/*
+Validate the browser's silent-auth settings.
+oidcAutoSignIn without oidcSilentRenew is the misconfiguration that matters:
+silent_redirect_uri then falls back to the application itself, so the sign-in
+attempt on every page load boots the SPA in a hidden iframe and waits out the
+full timeout - including for anonymous visitors, who pay it for nothing.
+*/}}
+{{- define "eoapi.validateBrowserAuth" -}}
+{{- if and .Values.browser.oidcAutoSignIn (not .Values.browser.oidcSilentRenew) }}
+{{- fail "browser.oidcAutoSignIn requires browser.oidcSilentRenew: without the silent landing page every page load stalls for the iframe timeout (~10s), anonymous ones included." }}
+{{- end }}
+{{- end -}}

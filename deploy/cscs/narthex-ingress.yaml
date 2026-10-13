@@ -1,0 +1,79 @@
+# narthex on its own subdomain, outside the ForwardAuth gate: the SPA is its
+# own OIDC client and narthex-backend validates bearer tokens itself, the same
+# shape as /browser + /stac. Only the IP allowlist applies.
+#
+# Consequences worth keeping in mind:
+#  - no Traefik `errors` middleware anywhere near /api, so narthex-backend's
+#    JSON 401s reach the caller intact;
+#  - CORS preflights hit the backend directly, which handles them via
+#    narthex-backend.corsOrigins - no Method(`OPTIONS`) bypass route needed.
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: narthex-api-strip-prefix
+  namespace: eoapi-dev
+spec:
+  stripPrefix:
+    prefixes:
+      - /api
+---
+# /api and / are separate Ingress objects because router.middlewares is
+# per-Ingress. Priority is pinned: Traefik's longest-rule-wins was observed
+# not to reliably prefer the more specific path across resources.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: eoapi-dev-narthex-api
+  namespace: eoapi-dev
+  annotations:
+    traefik.ingress.kubernetes.io/router.entrypoints: "websecure"
+    traefik.ingress.kubernetes.io/router.tls: "true"
+    traefik.ingress.kubernetes.io/router.middlewares: "eoapi-dev-eoapi-dev-ipallowlist@kubernetescrd,eoapi-dev-narthex-api-strip-prefix@kubernetescrd"
+    traefik.ingress.kubernetes.io/router.priority: "1000"
+spec:
+  ingressClassName: traefik
+  rules:
+    - host: narthex-prometheus-dev.c2sm-tds.c2sm.cscs.ch
+      http:
+        paths:
+          - path: /api
+            pathType: Prefix
+            backend:
+              service:
+                name: eoapi-narthex-backend
+                port:
+                  number: 8000
+  tls:
+    - hosts:
+        - narthex-prometheus-dev.c2sm-tds.c2sm.cscs.ch
+      secretName: narthex-eoapi-dev-tls
+---
+# Root/SPA. Carries the cert-manager annotation: only one Ingress may own the
+# shared TLS secret, or cert-manager races itself over the same secret name.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: eoapi-dev-narthex
+  namespace: eoapi-dev
+  annotations:
+    cert-manager.io/cluster-issuer: "letsencrypt-http01-traefik"
+    traefik.ingress.kubernetes.io/router.entrypoints: "websecure"
+    traefik.ingress.kubernetes.io/router.tls: "true"
+    traefik.ingress.kubernetes.io/router.middlewares: "eoapi-dev-eoapi-dev-ipallowlist@kubernetescrd"
+spec:
+  ingressClassName: traefik
+  rules:
+    - host: narthex-prometheus-dev.c2sm-tds.c2sm.cscs.ch
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: eoapi-narthex-frontend
+                port:
+                  number: 80
+  tls:
+    - hosts:
+        - narthex-prometheus-dev.c2sm-tds.c2sm.cscs.ch
+      secretName: narthex-eoapi-dev-tls

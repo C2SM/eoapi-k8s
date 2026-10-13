@@ -1,0 +1,130 @@
+ingress:
+    enabled: true
+    className: traefik
+    host: localhost
+    tls:
+        enabled: false
+    annotations:
+        traefik.ingress.kubernetes.io/router.entrypoints: web
+
+raster:
+    enabled: true
+    ingress:
+        enabled: true
+        path: "/raster"
+
+vector:
+    enabled: true
+    ingress:
+        enabled: true
+        path: "/vector"
+
+multidim:
+    enabled: false
+    ingress:
+        enabled: false
+
+browser:
+    enabled: true
+    oidcClientId: "test-client"
+    oidcDiscoveryUrl: "http://localhost/mock-oidc/.well-known/openid-configuration"
+    catalogUrl: "http://localhost/stac"
+    ingress:
+        enabled: true
+        path: "/browser"
+
+stac:
+    enabled: true
+    ingress:
+        enabled: false
+    overrideRootPath: ""
+    settings:
+        envVars:
+            WEB_CONCURRENCY: "2"
+            STAC_FASTAPI_DEBUG: "True"
+            STAC_FASTAPI_CORS_ORIGINS: "*"
+
+stac-auth-proxy:
+    enabled: true
+    ingress:
+        enabled: true
+        className: traefik
+        host: localhost
+        path: /stac
+        annotations:
+            traefik.ingress.kubernetes.io/router.entrypoints: web
+    env:
+        UPSTREAM_URL: "http://eoapi-stac:8080"
+        ROOT_PATH: "/stac"
+        OVERRIDE_HOST: "false"
+        DEFAULT_PUBLIC: "true"
+        OIDC_DISCOVERY_URL: "http://localhost/mock-oidc/.well-known/openid-configuration"
+        OIDC_DISCOVERY_INTERNAL_URL: "http://eoapi-mock-oidc-server.eoapi.svc.cluster.local:8080/.well-known/openid-configuration"
+    startupProbe:
+        httpGet:
+            path: /stac/healthz
+            port: http
+        periodSeconds: 2
+        failureThreshold: 30
+
+    livenessProbe:
+        httpGet:
+            path: /stac/healthz
+            port: http
+        periodSeconds: 60
+        failureThreshold: 3
+
+    readinessProbe:
+        httpGet:
+            path: /stac/healthz
+            port: http
+        periodSeconds: 5
+        failureThreshold: 3
+
+testing:
+    mockOidcServer:
+        enabled: true
+        replicaCount: 1
+        image:
+            repository: ghcr.io/alukach/mock-oidc-server
+            tag: latest
+            pullPolicy: IfNotPresent
+        port: 8080
+        clientId: "test-client"
+        clientSecret: "test-secret"
+        extraEnv:
+            - name: ISSUER
+              value: "http://localhost/mock-oidc"
+            - name: PORT
+              value: "8080"
+        service:
+            type: ClusterIP
+            port: 8080
+        ingress:
+            enabled: true
+            path: "/mock-oidc"
+        resources:
+            requests:
+                cpu: "50m"
+                memory: "64Mi"
+            limits:
+                cpu: "100m"
+                memory: "128Mi"
+
+eoapi-notifier:
+    enabled: false
+
+knative:
+    enabled: false
+
+monitoring:
+    metricsServer:
+        enabled: false
+    prometheus:
+        enabled: false
+    prometheusAdapter:
+        enabled: false
+
+observability:
+    grafana:
+        enabled: false

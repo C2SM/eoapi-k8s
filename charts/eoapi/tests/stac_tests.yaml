@@ -1,0 +1,131 @@
+suite: stac service tests
+templates:
+  - templates/_helpers/core.tpl
+  - templates/_helpers/database.tpl
+  - templates/_helpers/services.tpl
+  - templates/services/stac/deployment.yaml
+  - templates/services/stac/configmap.yaml
+  - templates/services/stac/service.yaml
+  - templates/services/stac/hpa.yaml
+tests:
+  - it: "stac deployment defaults"
+    set:
+      raster.enabled: false
+      stac.enabled: true
+      vector.enabled: false
+      multidim.enabled: false
+    template: templates/services/stac/deployment.yaml
+    asserts:
+      - isKind:
+          of: Deployment
+      - matchRegex:
+          path: metadata.name
+          pattern: ^RELEASE-NAME-stac$
+      - equal:
+          path: spec.strategy.type
+          value: "RollingUpdate"
+
+  - it: "stac deployment includes configmap checksum annotation"
+    set:
+      stac.enabled: true
+      raster.enabled: false
+      vector.enabled: false
+      multidim.enabled: false
+    template: templates/services/stac/deployment.yaml
+    asserts:
+      - exists:
+          path: spec.template.metadata.annotations["checksum/config"]
+      - matchRegex:
+          path: spec.template.metadata.annotations["checksum/config"]
+          pattern: ^[a-f0-9]{64}$
+
+  - it: "stac deployment uses ingress path when root path override is absent"
+    set:
+      ingress.className: "traefik"
+      stac.enabled: true
+      raster.enabled: false
+      vector.enabled: false
+      multidim.enabled: false
+    template: templates/services/stac/deployment.yaml
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].command
+          content: "--root-path=/stac"
+
+  - it: "stac deployment omits root path for an empty override"
+    set:
+      ingress.className: "traefik"
+      stac.enabled: true
+      stac.overrideRootPath: ""
+      raster.enabled: false
+      vector.enabled: false
+      multidim.enabled: false
+    template: templates/services/stac/deployment.yaml
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].command
+          value:
+            - uvicorn
+            - stac_fastapi.pgstac.app:app
+            - --host=$(HOST)
+            - --port=$(PORT)
+            - --proxy-headers
+            - --forwarded-allow-ips=*
+
+  - it: "stac deployment uses a non-empty root path override"
+    set:
+      ingress.className: "traefik"
+      stac.enabled: true
+      stac.overrideRootPath: "/api"
+      raster.enabled: false
+      vector.enabled: false
+      multidim.enabled: false
+    template: templates/services/stac/deployment.yaml
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].command
+          content: "--root-path=/api"
+
+  - it: "stac configmap defaults"
+    set:
+      raster.enabled: false
+      stac.enabled: true
+      vector.enabled: false
+      multidim.enabled: false
+    template: templates/services/stac/configmap.yaml
+    asserts:
+      - isKind:
+          of: ConfigMap
+      - matchRegex:
+          path: metadata.name
+          pattern: ^RELEASE-NAME-stac-envvar-configmap$
+      - equal:
+          path: data.WEB_CONCURRENCY
+          value: "10"
+
+  - it: "stac browser service"
+    set:
+      raster.enabled: false
+      stac.enabled: true
+      vector.enabled: false
+      multidim.enabled: false
+      browser.enabled: false
+      stac.annotations:
+        annotation1: hello
+        annotation2: world
+    template: templates/services/stac/service.yaml
+    asserts:
+      - isKind:
+          of: Service
+      - matchRegex:
+          path: metadata.name
+          pattern: ^RELEASE-NAME-stac$
+      - matchRegex:
+          path: metadata.labels.app
+          pattern: ^RELEASE-NAME-stac$
+      - equal:
+          path: metadata.annotations.annotation1
+          value: hello
+      - equal:
+          path: metadata.annotations.annotation2
+          value: world

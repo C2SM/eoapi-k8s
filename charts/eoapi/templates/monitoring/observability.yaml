@@ -1,0 +1,11 @@
+{{- if .Values.observability.grafana.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-dashboards
+  labels:
+    eoapi_dashboard: "1"
+data:
+  kubernetes.json: |-
+{{ .Files.Get "data/dashboards/eoAPI-Dashboard.json" | indent 4 }}
+{{- end }}

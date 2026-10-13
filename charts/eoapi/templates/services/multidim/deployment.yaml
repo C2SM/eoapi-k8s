@@ -1,0 +1,119 @@
+{{- if .Values.multidim.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    {{- include "eoapi.labels" . | nindent 4 }}
+    app.kubernetes.io/component: multidim
+    app: {{ .Release.Name }}-multidim
+    gitsha: {{ include "eoapi.gitSha" . }}
+  name: {{ .Release.Name }}-multidim
+  {{- if .Values.multidim.annotations }}
+  annotations:
+    {{- with .Values.multidim.annotations }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+  {{- end }}
+spec:
+  progressDeadlineSeconds: 600
+  revisionHistoryLimit: 5
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 50%
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      {{- include "eoapi.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: multidim
+      app: {{ .Release.Name }}-multidim
+  template:
+    metadata:
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/services/multidim/configmap.yaml") . | sha256sum }}
+      labels:
+        {{- include "eoapi.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: multidim
+        app: {{ .Release.Name }}-multidim
+        {{- with .Values.multidim.settings.labels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      {{- include "eoapi.pgstacInitContainers" . | nindent 6 }}
+      containers:
+      - image: {{ include "eoapi.containerImage" .Values.multidim.image }}
+        imagePullPolicy: {{ .Values.multidim.image.pullPolicy | default "IfNotPresent" }}
+        name: multidim
+        command:
+          {{- toYaml .Values.multidim.command | nindent 10 }}
+          {{- if (and (.Values.ingress.className) (or (eq .Values.ingress.className "nginx") (eq .Values.ingress.className "traefik"))) }}
+          - "--proxy-headers"
+          - "--forwarded-allow-ips=*"
+          {{- if .Values.multidim.overrideRootPath}}
+          - "--root-path={{ .Values.multidim.overrideRootPath }}"
+          {{- else }}
+          - "--root-path={{ .Values.multidim.ingress.path }}"
+          {{- end }}
+          {{- end }}{{/* needed for proxies and path rewrites on NLB */}}
+        livenessProbe:
+          tcpSocket:
+            port: {{ .Values.service.port }}
+          failureThreshold: 3
+          periodSeconds: 15
+          successThreshold: 1
+          timeoutSeconds: 1
+        readinessProbe:
+          httpGet:
+            {{- if .Values.multidim.overrideRootPath}}
+            path: {{ .Values.multidim.overrideRootPath }}/healthz
+            {{- else}}
+            path: /healthz
+            {{- end}}
+            port: {{ .Values.service.port }}
+          failureThreshold: 3
+          periodSeconds: 15
+          successThreshold: 1
+        startupProbe:
+          httpGet:
+            {{- if .Values.multidim.overrideRootPath}}
+            path: {{ .Values.multidim.overrideRootPath }}/healthz
+            {{- else}}
+            path: /healthz
+            {{- end}}
+            port: {{ .Values.service.port }}
+          # check every sec for 1 minute
+          periodSeconds: 1
+          failureThreshold: 60
+          successThreshold: 1
+        ports:
+          - containerPort: {{ .Values.service.port }}
+        resources:
+          {{- toYaml .Values.multidim.settings.resources | nindent 10 }}
+        env:
+          {{- include "eoapi.postgresqlEnv" . | nindent 10 }}
+          {{- include "eoapi.commonEnvVars" (dict "service" "multidim" "root" .) | nindent 10 }}
+        envFrom:
+          - configMapRef:
+              name: {{ .Release.Name }}-multidim-envvar-configmap
+          {{- if .Values.multidim.settings.extraEnvFrom }}
+          {{- toYaml .Values.multidim.settings.extraEnvFrom | nindent 10 }}
+          {{- end }}
+        {{- include "eoapi.mountServiceSecrets" (dict "service" "multidim" "root" .) | nindent 10 }}
+        {{- with .Values.multidim.settings.extraVolumeMounts }}
+        volumeMounts:
+          {{- toYaml . | nindent 10 }}
+        {{- end }}
+      volumes:
+        {{- with .Values.multidim.settings.extraVolumes }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      serviceAccountName: {{ include "eoapi.serviceAccountName" . }}
+      {{- with .Values.multidim.settings.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.multidim.settings.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+{{- end }}

@@ -1,0 +1,20 @@
+{{- if .Values.multidim.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}-multidim
+  labels:
+    app: {{ .Release.Name }}-multidim
+  {{- if .Values.multidim.annotations }}
+  annotations:
+    {{- with .Values.multidim.annotations }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+  {{- end }}
+spec:
+  ports:
+    - port: {{ .Values.service.port }}
+      targetPort: {{ .Values.service.port }}
+  selector:
+    app: {{ .Release.Name }}-multidim
+{{- end }}

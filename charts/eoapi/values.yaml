@@ -1,0 +1,1089 @@
+comment_install: >
+  A manual installation looks like this:
+
+  $ helm install \
+      --namespace eoapi \
+      --create-namespace \
+      eoapi \
+      ./eoapi
+
+# Replaced at chart publish time; falls back to chart version when unset.
+gitSha: "gitshaABC123"
+
+#######################
+# SERVICE ACCOUNT
+#######################
+serviceAccount:
+  create: true
+  name: ""
+  automount: true
+  annotations: {}
+  labels: {}
+
+#######################
+# RBAC
+#######################
+# rbac.create controls whether Role, RoleBinding, ClusterRole, and
+# ClusterRoleBinding resources are created. Independent of serviceAccount.create.
+rbac:
+  create: true
+
+######################
+# SERVICE & INGRESS
+######################
+service:
+  port: 8080
+
+ingress:
+  # Unified ingress configuration for both nginx and traefik
+  enabled: true
+  # ingressClassName: "nginx" or "traefik"
+  className: "nginx"
+  # Traefik only: value for the router's `entrypoints` annotation, e.g. "websecure"
+  # or "web,websecure". Empty → the annotation is omitted and the router attaches to
+  # all Traefik entrypoints (Traefik's default). Note "web" is conventionally the
+  # HTTP entrypoint, so pinning to it alone will not serve HTTPS.
+  entrypoints: ""
+  rootPath: ""        # Root path for doc server
+  # Single host domain configuration (default)
+  host: ""
+  # Multiple host domains array - if specified, takes precedence over single host
+  # hosts: []
+  # Custom annotations (nginx rewrite-target/use-regex are chart-owned; Traefik
+  # router annotations can override generated defaults)
+  annotations: {}
+  # TLS configuration
+  tls:
+    enabled: false
+    secretName: eoapi-tls
+
+######################
+# DATABASE
+######################
+comment_db: >
+  We use the crunchydata postgres operator/cluster charts as the k8s internal HA solution for eoapi.
+  Those charts are therefore listed as a dependency of this chart in `Chart.yaml`.
+
+  0. make sure to install the operator first `helm install --set disable_check_for_upgrades=true pgo oci://registry.developers.crunchydata.com/crunchydata/pgo`
+  1. it will create a postgres cluster: see `postgrescluster.instances` spec below
+  2. will will also create user credentials and mount their secrets: see `postgrescluster.users` spec below
+
+  The `postgrescluster` specs below are pass-through values to configure those separate
+  charts. For more information read https://access.crunchydata.com/documentation/postgres-operator/latest
+
+# unified PostgreSQL configuration
+postgresql:
+  # Management type: "postgrescluster" (default), "external-plaintext", or "external-secret"
+  type: "postgrescluster"
+
+  # Configuration for external PostgreSQL (used when type is "external-plaintext" or "external-secret")
+  external:
+    # Connection information
+    host: ""
+    port: "5432"
+    database: "eoapi"
+
+    # Credentials configuration (used when type is "external-plaintext")
+    credentials:
+      username: ""
+      password: ""
+
+    # Secret reference (used when type is "external-secret")
+    existingSecret:
+      name: ""
+      # Key mapping for the secret
+      keys:
+        username: "username"
+        password: "password"
+        # Optional: if these are provided in the secret
+        # Note: These values override external.host, external.port and external.database if defined
+        host: "host"
+        port: "port"
+        database: "database"
+
+# this is declared as a dependency of eoapi in charts/eoapi/Chart.yaml
+postgrescluster:
+  enabled: true
+  # The name of the postgres cluster
+  # name: pgstac
+  postgresVersion: 16
+  postGISVersion: "3.4"
+  pgBouncerReplicas: 1
+  monitoring: false
+  postgresClusterAnnotations: {}
+  # Configure Patroni to set proper schema permissions
+  patroni:
+    dynamicConfiguration:
+      postgresql:
+        pg_hba:
+          - "host all all 0.0.0.0/0 md5"
+        parameters:
+          shared_preload_libraries: pg_stat_statements, auto_explain
+  databaseInitSQL:
+    key: initdb.sql
+    name: initdb
+  instances:
+    - name: eoapi
+      replicas: 1
+      dataVolumeClaimSpec:
+        accessModes:
+          - "ReadWriteOnce"
+        resources:
+          requests:
+            storage: "10Gi"
+            cpu: "1024m"
+            memory: "3048Mi"
+  # https://access.crunchydata.com/documentation/postgres-operator/latest/architecture/user-management
+  users:
+    # `postgres` always has SUPERUSER privileges
+    # we use this block here to create secrets for the `postgres` user that we can mount and lookup
+    - name: postgres
+      databases:
+        - eoapi
+        - postgres
+      options: "SUPERUSER"
+    # Grant CREATEROLE privilege to eoapi user so it can create the pgstac_admin role
+    # If you grant SUPERUSER to the eoapi user, it won't be able to connect through pgbouncer
+    # https://access.crunchydata.com/documentation/crunchy-postgres-containers/2.4.2/container-specifications/crunchy-pgbouncer/
+    - name: eoapi
+      databases:
+        - eoapi
+        - postgres
+      options: "CREATEDB CREATEROLE"
+      # default `password.type` is ASCII which follows the character set US-ASCII
+      # but which can contain characters that `asyncpg` dislikes
+      # see https://github.com/MagicStack/asyncpg/issues/1151
+      password:
+        type: AlphaNumeric
+
+# Second, independent postgrescluster instance (see the aliased dependency
+# entry in Chart.yaml) for the narthex service's own database — not shared
+# with the pgstac cluster above.
+postgrescluster-narthex:
+  enabled: false
+  name: "narthex"
+  postgresVersion: 16
+  pgBouncerReplicas: 1
+  monitoring: false
+  instances:
+    - name: narthex
+      replicas: 1
+      dataVolumeClaimSpec:
+        accessModes:
+          - "ReadWriteOnce"
+        resources:
+          requests:
+            storage: "5Gi"
+  users:
+    # Only used by the one-off narthex-superuser-init-db job (see
+    # templates/database/narthex-superuser-initdb.yaml) to reassign public
+    # schema ownership - PG15+ no longer grants CREATE on it to the
+    # database owner by default. Same reasoning as the pgstac cluster's own
+    # `postgres` user entry / eoap-superuser-initdb.yaml.
+    - name: postgres
+      databases:
+        - narthex
+      options: "SUPERUSER"
+    - name: narthex
+      databases:
+        - narthex
+      options: "CREATEDB"
+
+# `pgstacBootstrap` is a pod that by default runs pgstac schema migrations
+# and optionally loads some fixtures for testing and examples
+# using the LOAD_FIXTURES env var below
+pgstacBootstrap:
+  enabled: true
+  image:
+    name: ghcr.io/stac-utils/pgstac-pypgstac
+    tag: v0.9.12
+    pullPolicy: IfNotPresent
+  # kubectl image used by service initContainers waiting on pgstac jobs
+  waitImage:
+    name: alpine/kubectl
+    tag: "1.34.1"
+    pullPolicy: IfNotPresent
+  configMaps:
+    pgstacSettings:
+      annotations:
+        helm.sh/hook: "post-install,post-upgrade"
+        helm.sh/hook-weight: "-7"
+        helm.sh/hook-delete-policy: "before-hook-creation,hook-succeeded"
+    initdbSql:
+      annotations:
+        helm.sh/hook: "post-install,post-upgrade"
+        helm.sh/hook-weight: "-7"
+        helm.sh/hook-delete-policy: "before-hook-creation,hook-succeeded"
+    initdbJson:
+      annotations:
+        helm.sh/hook: "post-install,post-upgrade"
+        helm.sh/hook-weight: "-7"
+        helm.sh/hook-delete-policy: "before-hook-creation,hook-succeeded"
+    pgstacQueryables:
+      annotations:
+        helm.sh/hook: "post-install,post-upgrade"
+        helm.sh/hook-weight: "-7"
+        helm.sh/hook-delete-policy: "before-hook-creation,hook-succeeded"
+    initdb:
+      annotations: {}
+  jobs:
+    pgstacSuperuserInitDb:
+      annotations:
+        helm.sh/hook: "post-install,post-upgrade"
+        helm.sh/hook-weight: "-6"
+        helm.sh/hook-delete-policy: "before-hook-creation"
+    pgstacMigrate:
+      annotations:
+        helm.sh/hook: "post-install,post-upgrade"
+        helm.sh/hook-weight: "-5"
+        helm.sh/hook-delete-policy: "before-hook-creation"
+    pgstacLoadSamples:
+      annotations:
+        helm.sh/hook: "post-install,post-upgrade"
+        helm.sh/hook-weight: "-4"
+        helm.sh/hook-delete-policy: "before-hook-creation"
+    pgstacLoadQueryables:
+      annotations:
+        helm.sh/hook: "post-install,post-upgrade"
+        helm.sh/hook-weight: "-3"
+        helm.sh/hook-delete-policy: "before-hook-creation"
+
+
+  settings:
+    # General configuration options
+    loadSamples: true      # Set to false to disable sample data loading
+
+    # Queryables configuration
+    # List of queryables configurations to load using pypgstac load-queryables
+    # Each item requires a mandatory 'name' field and either 'file' or 'configMapRef'
+    #
+    # Example using files from the chart:
+    # queryables:
+    #   - name: "common-queryables.json"
+    #     file: "data/initdb/queryables/common-queryables.json"
+    #     indexFields: ["platform", "instruments"]
+    #     deleteMissing: true
+    #   - name: "collection-specific.json"
+    #     file: "data/initdb/queryables/collection-specific.json"
+    #     collections: ["my-collection-1", "my-collection-2"]
+    #     indexFields: ["custom:field1", "custom:field2"]
+    #     deleteMissing: true
+    #
+    # Example using external ConfigMap references:
+    #   - name: "custom-queryables.json"
+    #     configMapRef:
+    #       name: my-custom-queryables-configmap
+    #       key: queryables.json
+    #     indexFields: ["custom:field1"]
+    #     deleteMissing: true
+    queryables: []
+
+    # PgSTAC settings configuration
+    # These settings control key PgSTAC behaviors and performance characteristics
+    pgstacSettings:
+      # Queue configuration for handling complex queries
+      queue_timeout: "10 minutes"        # Timeout for queued queries (PostgreSQL interval format)
+      use_queue: "false"                 # Enable/disable query queue mechanism
+
+      # Collection extent management
+      update_collection_extent: "true"   # Auto-update collection extents when items are added/modified
+
+      # Context configuration for search results
+      context: "off"                     # Context mode: "on", "off", or "auto" (pgSTAC default: off)
+      context_estimated_count: "100000"  # Row threshold for using estimates instead of exact counts
+      context_estimated_cost: "100000"   # Query cost threshold for using estimates
+      context_stats_ttl: "1 day"         # Cache duration for context statistics
+
+    # Queue processing configuration (only used when use_queue is "true")
+    queueProcessor:
+      schedule: "0 * * * *"               # Run every hour
+
+    # Extent updater configuration (only used when update_collection_extent is "false")
+    extentUpdater:
+      schedule: "0 2 * * *"               # Run daily at 2 AM
+
+    # Wait configuration for init containers waiting for pgstac jobs
+    # These parameters control how long services wait for pgstac migration jobs to complete
+    waitConfig:
+      # Sleep interval between job status checks (in seconds)
+      sleepInterval: 5
+      # Maximum time to wait for jobs to complete (in seconds)
+      # Default: 900 seconds (15 minutes)
+      timeout: 900
+    ### Database connection settings TEMPORARY UNTIL WE HAVE A BETTER SOLUTION
+    ### FOR CONFIGURING THE DB CONNECTION
+    user: eoapi
+    database: eoapi
+    resources: {}
+    # DEPRECATED: Use pgstacBootstrap.settings.loadSamples instead
+    envVars:
+      # toggle to "false" if you don't want fixtures default loaded
+      LOAD_FIXTURES: "true"
+
+######################
+# API SERVICES
+######################
+apiServices:
+  - raster
+  - multidim
+  - stac
+  - vector
+
+raster:
+  enabled: true
+  ingress:
+    enabled: true  # Control ingress specifically for raster service
+    path: "/raster"  # Configurable path prefix for the raster service
+  autoscaling:
+    # NOTE: to have autoscaling working you'll need to enable monitoring
+    # see ../../../docs/autoscaling.md for more information
+    enabled: false
+    minReplicas: 1
+    maxReplicas: 10
+    # `type`: "cpu" || "requestRate" || "both"
+    type: "requestRate"
+    behavior:
+      scaleDown:
+        stabilizationWindowSeconds: 60
+      scaleUp:
+        stabilizationWindowSeconds: 0
+    targets:
+      # matches `type` value above unless `type: "both"` is selected
+      cpu: 75
+      # 'm' units here represents generic milli (one-thousandth) unit instead of 'decimal'
+      # https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale-walkthrough/#quantities
+      # so when the average unit among these pods is <requestRate>/1000 then scale
+      # you can watch the actual/target in real time using `kubectl get hpa/<name>`
+      requestRate: 100000m
+  image:
+    name: ghcr.io/stac-utils/titiler-pgstac
+    tag: 3.1.0
+    pullPolicy: IfNotPresent
+  command:
+    - "uvicorn"
+    - "titiler.pgstac.main:app"
+    - "--host=$(HOST)"
+    - "--port=$(PORT)"
+  settings:
+    labels: {}
+    resources: {}
+    extraEnvFrom: []
+    extraVolumeMounts: []
+    extraVolumes: []
+    envVars:
+      ##############
+      # titiler
+      ##############
+      GDAL_CACHEMAX: "200"  # 200 mb
+      GDAL_DISABLE_READDIR_ON_OPEN: "EMPTY_DIR"
+      GDAL_INGESTED_BYTES_AT_OPEN: "32768"
+      GDAL_HTTP_MERGE_CONSECUTIVE_RANGES: "YES"
+      GDAL_HTTP_MULTIPLEX: "YES"
+      GDAL_HTTP_VERSION: "2"
+      PYTHONWARNINGS: "ignore"
+      VSI_CACHE: "TRUE"
+      VSI_CACHE_SIZE: "5000000"  # 5 MB (per file-handle)
+      ##############
+      # uvicorn
+      ##############
+      HOST: "0.0.0.0"
+      PORT: "8080"
+      # https://www.uvicorn.org/settings/#production
+      WEB_CONCURRENCY: "4" # CPU-intensive; reduce to 2-3 with autoscaling
+      DB_MIN_CONN_SIZE: "1"
+      # On a shared/external DB (postgrescluster.enabled=false) + autoscaling, cap these explicitly.
+      # See docs/autoscaling.md#external--shared-postgresql
+      DB_MAX_CONN_SIZE: "3" # Less intensive: Metadata queries only
+
+multidim:
+  enabled: false # disabled by default
+  ingress:
+    enabled: true  # Control ingress specifically for multidim service
+    path: "/multidim"  # Configurable path prefix for the multidim service
+  autoscaling:
+    # NOTE: to have autoscaling working you'll need to enable monitoring
+    # see ../../../docs/autoscaling.md for more information
+    enabled: false
+    minReplicas: 1
+    maxReplicas: 10
+    # `type`: "cpu" || "requestRate" || "both"
+    type: "requestRate"
+    behavior:
+      scaleDown:
+        stabilizationWindowSeconds: 60
+      scaleUp:
+        stabilizationWindowSeconds: 0
+    targets:
+      # matches `type` value above unless `type: "both"` is selected
+      cpu: 75
+      # 'm' units here represents generic milli (one-thousandth) unit instead of 'decimal'
+      # https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale-walkthrough/#quantities
+      # so when the average unit among these pods is <requestRate>/1000 then scale
+      # you can watch the actual/target in real time using `kubectl get hpa/<name>`
+      requestRate: 100000m
+  image:
+    name: ghcr.io/developmentseed/titiler-md-demo
+    tag: 6406b10406287ba9d3f345706d0c2be5f0265e02
+    pullPolicy: IfNotPresent
+  command:
+    - "uvicorn"
+    - "titiler_md_demo.main:app"
+    - "--host=$(HOST)"
+    - "--port=$(PORT)"
+  settings:
+    labels: {}
+    resources: {}
+    extraEnvFrom: []
+    extraVolumeMounts: []
+    extraVolumes: []
+    envVars:
+      ##############
+      # titiler
+      ##############
+      GDAL_CACHEMAX: "200"  # 200 mb
+      GDAL_DISABLE_READDIR_ON_OPEN: "EMPTY_DIR"
+      GDAL_INGESTED_BYTES_AT_OPEN: "32768"
+      GDAL_HTTP_MERGE_CONSECUTIVE_RANGES: "YES"
+      GDAL_HTTP_MULTIPLEX: "YES"
+      GDAL_HTTP_VERSION: "2"
+      PYTHONWARNINGS: "ignore"
+      VSI_CACHE: "TRUE"
+      VSI_CACHE_SIZE: "5000000"  # 5 MB (per file-handle)
+      ##############
+      # uvicorn
+      ##############
+      HOST: "0.0.0.0"
+      PORT: "8080"
+      # https://www.uvicorn.org/settings/#production
+      WEB_CONCURRENCY: "4" # CPU-intensive; reduce to 2-3 with autoscaling
+      DB_MIN_CONN_SIZE: "1"
+      # On a shared/external DB (postgrescluster.enabled=false) + autoscaling, cap these explicitly.
+      # See docs/autoscaling.md#external--shared-postgresql
+      DB_MAX_CONN_SIZE: "3" # Less intensive: Metadata queries only
+
+stac:
+  enabled: true
+  ingress:
+    enabled: true  # Control ingress specifically for stac service
+    path: "/stac"  # Configurable path prefix for the stac service
+  autoscaling:
+    # NOTE: to have autoscaling working you'll need to enable monitoring
+    # see ../../../docs/autoscaling.md for more information
+    enabled: false
+    minReplicas: 1
+    maxReplicas: 10
+    # `type`: "cpu" || "requestRate" || "both"
+    type: "requestRate"
+    behavior:
+      scaleDown:
+        stabilizationWindowSeconds: 60
+      scaleUp:
+        stabilizationWindowSeconds: 0
+    targets:
+      # matches `type` value above unless `type: "both"` is selected
+      cpu: 75
+      # 'm' units here represents generic milli (one-thousandth) unit instead of 'decimal'
+      # https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale-walkthrough/#quantities
+      # so when the average unit among these pods is <requestRate>/1000 then scale
+      # you can watch the actual/target in real time using `kubectl get hpa/<name>`
+      requestRate: 100000m
+  image:
+    name: ghcr.io/stac-utils/stac-fastapi-pgstac
+    tag: 6.3.1
+    pullPolicy: IfNotPresent
+  command:
+    - "uvicorn"
+    - "stac_fastapi.pgstac.app:app"
+    - "--host=$(HOST)"
+    - "--port=$(PORT)"
+  settings:
+    labels: {}
+    resources: {}
+    extraEnvFrom: []
+    extraVolumeMounts: []
+    extraVolumes: []
+    envVars:
+      ##############
+      # uvicorn
+      ##############
+      HOST: "0.0.0.0"
+      PORT: "8080"
+      # https://www.uvicorn.org/settings/#production
+      WEB_CONCURRENCY: "10" # Handles many concurrent requests; reduce to 4-6 with autoscaling
+      DB_MIN_CONN_SIZE: "1"
+      # On a shared/external DB (postgrescluster.enabled=false) + autoscaling, cap these explicitly.
+      # See docs/autoscaling.md#external--shared-postgresql (STAC opens 2 pools w/ transactions).
+      DB_MAX_CONN_SIZE: "5" # Quite intensive (queries, transactions, searches)
+
+# STAC Auth Proxy - authentication layer for STAC API
+stac-auth-proxy:
+  enabled: false
+  image:
+    tag: "v1.2.0"
+  ingress:
+    enabled: false  # Handled by main eoapi ingress
+  service:
+    port: 8080
+  # Production-oriented defaults; override per cluster. Low CPU limits cause throttling under load.
+  resources:
+    requests:
+      cpu: 500m
+      memory: 256Mi
+    limits:
+      cpu: 2000m
+      memory: 512Mi
+  # CPU-based HPA from the stac-auth-proxy subchart (requires metrics-server).
+  # When enabled, replicaCount is ignored. Request-rate metrics are nginx-ingress-specific on main services only.
+  autoscaling:
+    enabled: false
+    minReplicas: 1
+    maxReplicas: 10
+    targetCPUUtilizationPercentage: 75
+    behavior:
+      scaleDown:
+        stabilizationWindowSeconds: 60
+      scaleUp:
+        stabilizationWindowSeconds: 0
+  env:
+    # OIDC_DISCOVERY_URL must be configured when enabling auth (required)
+    # OIDC_DISCOVERY_INTERNAL_URL: in-cluster URL for startup health checks (subchart defaults to
+    # http://localhost:8081/... for an oauth2-proxy sidecar; set to your OIDC service when testing)
+    # UPSTREAM_URL must be set to "http://<release-name>-stac:8080" (required)
+    ROOT_PATH: "/stac"
+    # Skip ROOT_PATH rewrite for these prefixes in STAC response links
+    ROOT_PATH_SKIP_PREFIXES: "/raster,/vector,/browser,/multidim"
+    OVERRIDE_HOST: "false"
+    #
+    # Authentication filters settings:
+    DEFAULT_PUBLIC: "true" # This enables standard profile for authentication filters
+    #
+    # To use custom filters, ALL THREE of the following are required:
+    # 1. Set filter class environment variables (uncomment lines below)
+    # 2. Set customFiltersFile path (see below)
+    # 3. Configure extraVolumes and extraVolumeMounts (see below)
+    #
+    # COLLECTIONS_FILTER_CLS: stac_auth_proxy.custom_filters:CollectionsFilter
+    # ITEMS_FILTER_CLS: stac_auth_proxy.custom_filters:ItemsFilter
+
+  # Path to custom filters file (relative to chart root)
+  # Creates a ConfigMap from this file - required for custom filters
+  # customFiltersFile: "data/stac-auth-proxy/custom_filters.py"
+
+  # Volume referencing the ConfigMap - required for custom filters
+  extraVolumes: []
+  # Example (required for custom filters):
+  # extraVolumes:
+  #   - name: filters
+  #     configMap:
+  #       name: stac-auth-proxy-filters
+
+  # Volume mount making filters available to container - required for custom filters
+  extraVolumeMounts: []
+  # Example (required for custom filters):
+  # extraVolumeMounts:
+  #   - name: filters
+  #     mountPath: /app/src/stac_auth_proxy/custom_filters.py
+  #     subPath: custom_filters.py
+  #     readOnly: true
+
+vector:
+  enabled: true
+  ingress:
+    enabled: true  # Control ingress specifically for vector service
+    path: "/vector"  # Configurable path prefix for the vector service
+  autoscaling:
+    # NOTE: to have autoscaling working you'll need to enable monitoring
+    # see ../../../docs/autoscaling.md for more information
+    enabled: false
+    minReplicas: 1
+    maxReplicas: 10
+    # `type`: "cpu" || "requestRate" || "both"
+    type: "requestRate"
+    behavior:
+      scaleDown:
+        stabilizationWindowSeconds: 60
+      scaleUp:
+        stabilizationWindowSeconds: 0
+    targets:
+      # matches `type` value above unless `type: "both"` is selected
+      cpu: 75
+      # 'm' units here represents generic milli (one-thousandth) unit instead of 'decimal'
+      # https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale-walkthrough/#quantities
+      # so when the average unit among these pods is <requestRate>/1000 then scale
+      # you can watch the actual/target in real time using `kubectl get hpa/<name>`
+      requestRate: 100000m
+  image:
+    name: ghcr.io/developmentseed/tipg
+    tag: 1.5.0
+    pullPolicy: IfNotPresent
+  command:
+    - "uvicorn"
+    - "tipg.main:app"
+    - "--host=$(HOST)"
+    - "--port=$(PORT)"
+  settings:
+    labels: {}
+    resources: {}
+    extraEnvFrom: []
+    extraVolumeMounts: []
+    extraVolumes: []
+    envVars:
+      ##############
+      # tipg
+      ##############
+      TIPG_CATALOG_TTL: "300"
+      TIPG_DEBUG: "True"
+      ##############
+      # uvicorn
+      ##############
+      HOST: "0.0.0.0"
+      PORT: "8080"
+      WEB_CONCURRENCY: "8" # Moderate concurrency for complex spatial queries; reduce to 4-5 with autoscaling
+      DB_MIN_CONN_SIZE: "2"
+      # On a shared/external DB (postgrescluster.enabled=false) + autoscaling, cap these explicitly.
+      # See docs/autoscaling.md#external--shared-postgresql
+      DB_MAX_CONN_SIZE: "5" # Vector queries can be complex and long-running
+
+######################
+# STAC Browser
+######################
+# It is a good idea to deploy stac-browser outside of k8s, since it's SPA with static files.
+browser:
+  enabled: true
+  image:
+    name: ghcr.io/radiantearth/stac-browser
+    tag: "5.0.0"
+    pullPolicy: IfNotPresent
+  # Only needed when browser.image points at a private registry package,
+  # e.g. a custom deploy/browser-narthex/ build published as
+  # ghcr.io/c2sm/eoapi-browser-narthex (the stock radiantearth image is
+  # public and needs none of this).
+  imagePullSecrets: []
+  service:
+    port: 8080
+  ingress:
+    enabled: true  # Control ingress specifically for browser service
+    path: "/browser"
+  # OAuth2 client ID for browser (frontend app)
+  oidcClientId: "stac-browser"
+  # OIDC discovery URL for browser (must be externally accessible URL)
+  # Required when stac-auth-proxy is enabled
+  oidcDiscoveryUrl: ""
+  # OIDC scope requested by the browser's own login (oidc-client-ts). Widen
+  # this if anything downstream of the browser's token needs claims beyond
+  # "openid" alone, e.g. a group-based authorization check needing "groups".
+  # Whatever is listed here must also be granted to the client by the provider,
+  # or it rejects the whole authorization request. Think before adding
+  # "offline_access": some providers (Authelia) force a consent prompt on every
+  # login that asks for it, which costs more than the refresh token is worth.
+  oidcScope: "openid"
+  # Optional: where the browser's "Log out" sends the user to end the session
+  # at the identity provider itself. Needed for providers that advertise no
+  # end_session_endpoint (e.g. Authelia), where the OIDC RP-initiated logout
+  # the browser would otherwise attempt fails and leaves the IdP session
+  # standing. Leave empty for providers that do advertise one.
+  oidcLogoutUrl: ""
+  # Serve a small silent-renew landing page at <browser path>/silent-renew.html
+  # and point oidc-client-ts's silent_redirect_uri at it. Without it that
+  # setting falls back to redirect_uri - the application itself - and every
+  # background token renewal boots the whole SPA inside a hidden iframe and
+  # times out, so tokens simply expire after an hour. Off by default because it
+  # adds a served file; set it wherever the browser does real OIDC login.
+  oidcSilentRenew: false
+  # On load with no stored token, ask the provider for one without prompting.
+  # Turns "signed in at the provider but the Browser still shows the anonymous
+  # view until you click Log in" into signing in by itself. Requires
+  # oidcSilentRenew - without a working silent landing page the attempt stalls
+  # for the iframe timeout on every page load, including anonymous ones.
+  oidcAutoSignIn: false
+  # Optional: Override the STAC catalog URL for the browser
+  # If not set, will be constructed from ingress.host and stac.ingress.path
+  # Useful when using custom ingress solutions with ingress.enabled=false
+  catalogUrl: ""
+  # Optional: extra JS appended after stac-browser generates its own
+  # runtime-config.js from the SB_* environment variables/values above. Only
+  # needed for settings with no SB_* equivalent, e.g. JS callbacks such as
+  # buildTileUrlTemplate. Assign onto the already-defined config object, e.g.:
+  #   window.STAC_BROWSER_CONFIG.buildTileUrlTemplate = function(asset) { ... };
+  # Do not reassign window.STAC_BROWSER_CONFIG itself, or the SB_*-generated
+  # settings above will be lost.
+  customConfig: ""
+  # Optional: base64-encoded PNG content for a custom favicon shown at
+  # /browser/. Kept separate from customConfig since it's a binary asset
+  # mounted and linked into index.html's <head>, not JS runtime config.
+  # Generate with e.g.: base64 -w0 favicon.png
+  favicon: ""
+  # Custom catalog title
+  catalogTitle: ""
+  # Custom catalog image/logo URL
+  catalogImage: ""
+  # Custom footer links
+  footerLinks: []
+  # Example:
+  # footerLinks:
+  #   - label: "Terms of use"
+  #     url: "https://example.com/terms"
+  #   - label: "Privacy"
+  #     url: "https://example.com/privacy"
+  # Extra environment variables for the browser container. Use this to set any stac-browser
+  # SB_<option> config not covered by the values above (https://github.com/radiantearth/stac-browser).
+  extraEnv: []
+  # Example:
+  # extraEnv:
+  #   - name: SB_itemsPerPage
+  #     value: "60"
+  settings:
+    labels: {}
+    resources: {}
+
+######################
+# NARTHEX
+######################
+# Named, server-side lists of STAC items/collections (saved from the
+# stac-browser SaveToNarthex widget), plus a small admin SPA. Source lives
+# in a separate repo (github.com/C2SM/narthex); these two services deploy
+# its published images. See narthex-backend.authMode below for local/dev
+# vs. real-OIDC auth.
+narthex-backend:
+  enabled: false
+  image:
+    name: ghcr.io/c2sm/narthex-backend
+    tag: "v1.0.0-alpha"
+    pullPolicy: IfNotPresent
+  service:
+    port: 8000
+  ingress:
+    enabled: true
+    path: "/narthex-api"
+  # "dev": any non-empty bearer token is accepted as the owner id (no OIDC
+  # issuer needed). "oidc": validates bearer tokens against oidcIssuer's
+  # JWKS, accepting any token whose `aud` matches one of oidcAudiences -
+  # set both when using "oidc". Needs more than one entry whenever more
+  # than one OIDC client calls this API with its own token, e.g. the
+  # narthex admin SPA's own client (aud "narthex") *and* a
+  # stac-browser-embedded widget reusing stac-browser's own session token
+  # (aud "stac-browser") - see narthex backend/src/narthex/config.py's
+  # oidc_audiences (plural) for why this can't be a single value.
+  authMode: "dev"
+  oidcIssuer: ""
+  oidcAudiences:
+    - "narthex"
+  # Origins allowed to call this API (the narthex-frontend origin, and any
+  # stac-browser origin embedding the SaveToNarthex widget).
+  corsOrigins: []
+  # Name of a pre-existing Secret (created out-of-band, e.g. `kubectl create
+  # secret generic narthex-secrets --from-literal=launch-token-secret=...`)
+  # with a `launch-token-secret` key. Required outside of authMode "dev".
+  launchTokenSecretName: "narthex-secrets"
+  imagePullSecrets: []
+  settings:
+    labels: {}
+    resources: {}
+
+narthex-frontend:
+  enabled: false
+  image:
+    name: ghcr.io/c2sm/narthex-frontend
+    tag: "v1.0.0-alpha"
+    pullPolicy: IfNotPresent
+  service:
+    port: 80
+  ingress:
+    enabled: true
+    path: "/narthex"
+  # Public URL of narthex-backend's API (e.g. "https://<host>/narthex-api").
+  apiUrl: ""
+  # "dev" | "oidc" | "proxy" (narthex frontend/src/runtimeConfig.ts):
+  #  - dev:   any non-empty bearer token, its value *is* the owner id
+  #  - oidc:  the SPA runs its own OIDC client and attaches the token itself
+  #  - proxy: an upstream auth proxy (e.g. oauth2-proxy via ForwardAuth) has
+  #           already authenticated the user and injects the bearer token
+  #           into every forwarded request - no OIDC client in the browser,
+  #           no Authorization header set by the SPA. The oidc* values below
+  #           are unused in this mode.
+  # Empty falls back to narthex's own inference (oidc if oidcIssuer is set,
+  # else dev), preserving pre-NARTHEX_AUTH_MODE behaviour.
+  authMode: ""
+  # proxy mode only: where the logout control sends the browser, since
+  # sign-out belongs to the proxy (e.g. "https://<host>/oauth2/sign_out").
+  # Unset hides the logout control entirely.
+  logoutUrl: ""
+  # Empty oidcIssuer -> the SPA's own dev-mode token flow (matches
+  # narthex-backend.authMode "dev"). Set both to use real OIDC login.
+  oidcIssuer: ""
+  oidcClientId: "narthex"
+  # Must match a redirect URI registered for oidcClientId with the OIDC
+  # provider, e.g. "https://<host>/narthex/auth/callback".
+  oidcRedirectUri: ""
+  # Space-separated OIDC scopes. Empty uses narthex's own default
+  # ("openid profile email" - see frontend/src/runtimeConfig.ts). Must match
+  # what the provider grants this client, or it rejects the whole authorization
+  # request.
+  oidcScope: ""
+  # JupyterHub/notebook launch targets (narthex's "Launch in JupyterHub"
+  # button) - rendered as a YAML ConfigMap mounted into the pod and read via
+  # NARTHEX_LAUNCH_CONFIGS_FILE (narthex frontend/src/launchConfigs.ts,
+  # docker-entrypoint.d/40-generate-runtime-config.sh converts it to JSON at
+  # container startup). Empty by default: an unset/empty list here means no
+  # Hub targets are offered, not a fallback to narthex's own dev-only
+  # defaults (those only apply to an unbuilt local `npm run dev` checkout,
+  # never a deployed image).
+  # Each entry is a JupyterHubLaunchConfig, e.g.:
+  #   - id: "santis"
+  #     label: "Santis"
+  #     jupyterHubUrl: "https://jupyter-santis.cscs.ch"
+  #     notebookApp: "narthex-launch"
+  #     uenv: "eobs-lab/1.0:v1"
+  #     venv: "/path/to/venv"
+  #     notebook: "named-list-viewer"
+  launchConfigs: []
+  imagePullSecrets: []
+  settings:
+    labels: {}
+    resources: {}
+
+docServer:
+  enabled: true
+  redirectTo: ""  # When set, root path redirects here instead of showing the landing page (e.g. "/browser/")
+  # Replaces the root page wholesale, for a deployment that wants its own
+  # branding or a delayed rather than instant redirect (redirectTo emits a
+  # bare `content="0; url=..."` with no markup of its own). Takes precedence
+  # over redirectTo. Served as-is by nginx, so it must be a complete document
+  # and self-contained - there is nothing else in the doc-server's webroot to
+  # reference, so inline any CSS and use a data URI for images.
+  customHtml: ""
+  image:
+    name: nginxinc/nginx-unprivileged
+    tag: "1.27.4-alpine"
+    pullPolicy: IfNotPresent
+  settings:
+    resources: {}
+
+######################
+# NOTIFICATIONS
+######################
+eoapi-notifier:
+  enabled: false
+  serviceAccount:
+    name: ""
+    create: false
+  sources:
+    - type: pgstac
+      config:
+        # Database connection from existing Kubernetes secret
+        connection:
+          existingSecret:
+            name: ""
+            keys:
+              username: "user"
+              password: "password"
+              host: "host"
+              port: "port"
+              database: "dbname"
+
+  # Outputs: Define where notifications are sent
+  outputs:
+    - type: mqtt
+      config:
+        broker_host: mqtt-broker
+        broker_port: 1883
+        # Optional: username, password, use_tls, topic, qos
+
+    - type: cloudevents
+      config:
+        source: /eoapi/pgstac
+        # Event type is derived from operation (org.ogc.api.collection.item.create/replace/delete)
+        # For KNative SinkBinding:
+        destination:
+          ref:
+            apiVersion: messaging.knative.dev/v1
+            kind: Broker
+            name: my-channel-1
+            namespace: serverless
+            # For HTTP endpoints, use: endpoint: https://webhook.example.com
+
+######################
+# TESTING INFRASTRUCTURE
+######################
+# Components for testing only - DO NOT USE IN PRODUCTION
+
+# Mock OIDC server for testing stac-auth-proxy integration
+testing:
+  mockOidcServer:
+    enabled: false  # Only enabled in experimental profile
+    image:
+      name: ghcr.io/alukach/mock-oidc-server
+      # No version tags published; pin by digest (refresh when upgrading the image).
+      digest: sha256:5972adac0b6e3a094ea043be0f1851c65e3fd54e17a546f0b71dedd17c7a2d6a
+      pullPolicy: IfNotPresent
+
+######################
+# KNATIVE
+######################
+
+######################
+# KNATIVE
+######################
+# Optional Knative components for CloudEvents and serverless workloads
+knative:
+  enabled: false
+  version: "1.21"
+  initTimeout: "600s"
+  # CloudEvents sink configuration (deployed when eoapi-notifier uses CloudEvents output)
+  cloudEventsSink:
+    enabled: false
+    # Sample Knative sink; pin by digest (refresh when upgrading the image).
+    image:
+      name: gcr.io/knative-samples/helloworld-go
+      digest: sha256:ec6672b354dc9db37b221ee76fea62147d0450028208aa964011f685b1e0a3e3
+      pullPolicy: IfNotPresent
+    resources: {}
+    service:
+      annotations:
+        helm.sh/hook: "post-install,post-upgrade"
+        helm.sh/hook-weight: "10"
+        helm.sh/hook-delete-policy: "before-hook-creation"
+    sinkBinding:
+      annotations:
+        helm.sh/hook: "post-install,post-upgrade"
+        helm.sh/hook-weight: "30"
+        helm.sh/hook-delete-policy: "before-hook-creation"
+  jobs:
+    init:
+      image:
+        name: alpine/kubectl
+        tag: "1.34.1"
+        pullPolicy: IfNotPresent
+      annotations:
+        helm.sh/hook: "post-install,post-upgrade"
+        helm.sh/hook-weight: "0"
+        helm.sh/hook-delete-policy: "before-hook-creation,hook-succeeded"
+
+# Knative operator sub-chart configuration
+knative-operator:
+  tag: "v1.21.0"
+  resources: {}
+
+######################
+# MONITORING
+######################
+# Core monitoring components for metrics collection and autoscaling
+monitoring:
+  # Metrics server - essential for HPA functionality
+  metricsServer:
+    enabled: false
+    apiService:
+      create: true
+
+  # Prometheus - core metrics collection for autoscaling (subchart config: prometheus)
+  prometheus:
+    enabled: false
+
+  # Prometheus adapter - enables custom HPA metrics (subchart config: prometheus-adapter)
+  prometheusAdapter:
+    enabled: false
+
+######################
+# OBSERVABILITY
+######################
+# Grafana dashboards and visualization (requires monitoring.prometheus.enabled=true)
+observability:
+  grafana:
+    enabled: false
+    persistence:
+      enabled: false
+    service:
+      type: LoadBalancer
+      annotations:
+        service.beta.kubernetes.io/aws-load-balancer-type: "nlb"
+        service.beta.kubernetes.io/aws-load-balancer-internal: "false"
+    resources: {}
+    datasources:
+      datasources.yaml:
+        apiVersion: 1
+        datasources:
+          - name: Prometheus
+            type: prometheus
+            url: "http://{{ .Release.Name }}-prometheus-server"
+            access: proxy
+            isDefault: true
+    dashboardsConfigMaps:
+      default: "{{ .Release.Name }}-dashboards"
+
+# Metrics Server sub-chart configuration
+# These values are passed directly to the metrics-server sub-chart
+metrics-server:
+  apiService:
+    create: true
+
+# Prometheus sub-chart configuration
+# These values are passed directly to the prometheus sub-chart
+prometheus:
+  alertmanager:
+    enabled: false
+  prometheus-pushgateway:
+    enabled: false
+  kube-state-metrics:
+    enabled: true
+  prometheus-node-exporter:
+    enabled: true
+    resources: {}
+  server:
+    service:
+      type: ClusterIP  # Internal service, no external exposure by default
+
+# Prometheus Adapter sub-chart configuration
+# These values are passed directly to the prometheus-adapter sub-chart.
+# rules.custom[].name.as must match eoapi.hpaRequestRateMetricName per apiServices entry.
+prometheus-adapter:
+  prometheus:
+    # URL to Prometheus server - will be auto-configured for same-release Prometheus
+    # If using external Prometheus, set this to your Prometheus URL
+    # Example: http://my-prometheus-server.monitoring.svc.cluster.local
+    url: http://eoapi-prometheus-server.eoapi.svc.cluster.local
+    port: 80
+    path: ""
+  rules:
+    default: false
+    # Custom metrics for eoapi service autoscaling
+    # Each service gets its own request rate metric for HPA scaling
+    custom:
+      # Vector service request rate metric
+      - seriesQuery: '{__name__=~"^nginx_ingress_controller_requests$",namespace!=""}'
+        seriesFilters: []
+        resources:
+          template: <<.Resource>>
+        name:
+          matches: ""
+          as: "nginx_ingress_controller_requests_rate_vector_eoapi"
+        metricsQuery: round(sum(rate(<<.Series>>{service="vector",path=~"/vector.*",<<.LabelMatchers>>}[5m])) by (<<.GroupBy>>), 0.001)
+
+      # Raster service request rate metric
+      - seriesQuery: '{__name__=~"^nginx_ingress_controller_requests$",namespace!=""}'
+        seriesFilters: []
+        resources:
+          template: <<.Resource>>
+        name:
+          matches: ""
+          as: "nginx_ingress_controller_requests_rate_raster_eoapi"
+        metricsQuery: round(sum(rate(<<.Series>>{service="raster",path=~"/raster.*",<<.LabelMatchers>>}[5m])) by (<<.GroupBy>>), 0.001)
+
+      # STAC service request rate metric
+      - seriesQuery: '{__name__=~"^nginx_ingress_controller_requests$",namespace!=""}'
+        seriesFilters: []
+        resources:
+          template: <<.Resource>>
+        name:
+          matches: ""
+          as: "nginx_ingress_controller_requests_rate_stac_eoapi"
+        metricsQuery: round(sum(rate(<<.Series>>{service="stac",path=~"/stac.*",<<.LabelMatchers>>}[5m])) by (<<.GroupBy>>), 0.001)
+
+      # Multidim service request rate metric
+      - seriesQuery: '{__name__=~"^nginx_ingress_controller_requests$",namespace!=""}'
+        seriesFilters: []
+        resources:
+          template: <<.Resource>>
+        name:
+          matches: ""
+          as: "nginx_ingress_controller_requests_rate_multidim_eoapi"
+        metricsQuery: round(sum(rate(<<.Series>>{service="multidim",path=~"/multidim.*",<<.LabelMatchers>>}[5m])) by (<<.GroupBy>>), 0.001)

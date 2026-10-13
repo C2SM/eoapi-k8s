@@ -1,0 +1,69 @@
+# CSCS Keycloak: every identity-provider value of the eoapi-dev deployment.
+# Apply last, after values-cscs-dev.yaml and values-cscs-dev-stac-auth-proxy.yaml.
+#
+# One confidential client, prometheus-tds, on CSCS's production Keycloak. The oauth2-proxy
+# gate (auth-keycloak/) uses it with its secret; the SPAs below are configured
+# with it too, but a browser cannot authenticate a confidential client, so
+# their logins fail at the token exchange until they get a public client - see
+# auth-keycloak/README.md.
+
+# Not read by the chart. Anchors only, so each endpoint and client ID is
+# written once and every consumer below follows it.
+keycloak:
+  issuer: &issuer "https://auth.cscs.ch/auth/realms/cscs"
+  discoveryUrl: &discoveryUrl "https://auth.cscs.ch/auth/realms/cscs/.well-known/openid-configuration"
+  # Ends the CSCS SSO session, i.e. every CSCS app (jupyter-santis included),
+  # not just this one.
+  logoutUrl: &logoutUrl "https://auth.cscs.ch/auth/realms/cscs/protocol/openid-connect/logout"
+  client: &client "prometheus-tds"
+  # What prometheus-tds access tokens carry today: the client has no Audience
+  # mapper, and `account` is in practically every token the realm issues, so
+  # it restricts little beyond "issued by this realm". Switch to *client once
+  # CSCS adds a mapper putting prometheus-tds in aud.
+  audience: &audience "account"
+
+browser:
+  oidcClientId: *client
+  oidcDiscoveryUrl: *discoveryUrl
+  # `groups` is among the client's default scopes, so it is in the token
+  # without being requested. Asking for a scope the client lacks would make
+  # Keycloak reject the whole authorization request.
+  oidcScope: "openid profile email"
+  # Keycloak advertises an end_session_endpoint, but the patched browser build
+  # (deploy/browser-narthex/patches) never calls signoutRedirect(): it clears
+  # its own tokens and sends the browser here.
+  oidcLogoutUrl: *logoutUrl
+  # /browser/silent-renew.html must be a valid redirect URI on the client.
+  oidcSilentRenew: true
+  # Off while the browser cannot complete a login (see top of file): with an
+  # unregistered silent-renew URI every page load would stall ~10s on it.
+  oidcAutoSignIn: false
+
+stac-auth-proxy:
+  env:
+    OIDC_DISCOVERY_URL: *discoveryUrl
+    OIDC_DISCOVERY_INTERNAL_URL: *discoveryUrl
+    ALLOWED_JWT_AUDIENCES: *audience
+
+narthex-backend:
+  oidcIssuer: *issuer
+  oidcAudiences:
+    - *audience
+
+narthex-frontend:
+  oidcIssuer: *issuer
+  oidcClientId: *client
+  # Must be a valid redirect URI on the client.
+  oidcRedirectUri: "https://narthex-prometheus-dev.c2sm-tds.c2sm.cscs.ch/auth/callback"
+  # No "groups": narthex-backend authorizes named lists by preferred_username.
+  oidcScope: "openid profile email"
+  logoutUrl: *logoutUrl
+
+# oauth2-proxy's ForwardAuth gate on /raster, /vector, /multidim and /. It must
+# precede strip-prefix, since it matches its skip routes on the full path.
+# References are <namespace>-<name>@kubernetescrd; a wrong name silently drops
+# the whole router instead of failing, so check the rendered annotation with
+# `helm template ... | grep router.middlewares`.
+ingress:
+  annotations:
+    traefik.ingress.kubernetes.io/router.middlewares: "eoapi-dev-eoapi-dev-ipallowlist@kubernetescrd,eoapi-dev-eoapi-dev-oauth-forwardauth@kubernetescrd,eoapi-dev-eoapi-strip-prefix-middleware@kubernetescrd"

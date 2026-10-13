@@ -1,0 +1,86 @@
+{{- if and .Values.postgrescluster.enabled .Values.pgstacBootstrap.enabled }}
+---
+# The eoapi database user runs normally pgstac migrate.
+# But before some initial grants need to be given with a super user.
+# https://stac-utils.github.io/pgstac/pypgstac/#option-2-create-user-with-initial-grants
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ .Release.Name }}-pgstac-superuser-init-db
+  labels:
+    app: {{ .Release.Name }}-pgstac-superuser-init-db
+  {{- with .Values.pgstacBootstrap.jobs.pgstacSuperuserInitDb.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  template:
+    metadata:
+      labels:
+        app: {{ .Release.Name }}-pgstac-superuser-init-db
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: pgstac-eoapiuser-permissions
+          image: {{ include "eoapi.containerImage" .Values.pgstacBootstrap.image }}
+          imagePullPolicy: {{ .Values.pgstacBootstrap.image.pullPolicy | default "IfNotPresent" }}
+          command:
+            - "/bin/sh"
+            - "-c"
+          args:
+            - |
+              # Exit immediately if a command exits with a non-zero status
+              set -e
+
+              # Wait for the database to be ready
+              echo "Waiting for database to be ready..."
+              pypgstac pgready
+
+              # Run the initial setup with superuser
+              PGUSER=postgres psql -f /opt/sql/initdb.sql
+
+          resources:
+            {{- toYaml .Values.pgstacBootstrap.settings.resources | nindent 12 }}
+          volumeMounts:
+            - mountPath: /opt/sql
+              name: {{ .Release.Name }}-initdb-config
+          env:
+            - name: PGUSER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.postgrescluster.name | default .Release.Name }}-pguser-postgres
+                  key: user
+            - name: PGPORT
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.postgrescluster.name | default .Release.Name }}-pguser-postgres
+                  key: port
+            - name: PGHOST
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.postgrescluster.name | default .Release.Name }}-pguser-postgres
+                  key: host
+            - name: PGPASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.postgrescluster.name | default .Release.Name }}-pguser-postgres
+                  key: password
+            - name: PGDATABASE
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.postgrescluster.name | default .Release.Name }}-pguser-postgres
+                  key: dbname
+      volumes:
+        - name: {{ .Release.Name }}-initdb-config
+          configMap:
+            name: {{ .Release.Name }}-initdb
+      {{- with .Values.pgstacBootstrap.settings.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.pgstacBootstrap.settings.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+  backoffLimit: 5
+{{- end }}
