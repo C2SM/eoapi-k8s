@@ -340,10 +340,10 @@ postgrescluster:
           - "ReadWriteOnce"
         resources:
           requests:
-            storage: "500Gi"
+            storage: "1Ti"
       resources: {}
   backupsEnabled: true
-  backupsSize: "300Gi"
+  backupsSize: "600Gi"
   backupsStorageClassName: *cscsStorageClass
 
 postgrescluster-narthex:
