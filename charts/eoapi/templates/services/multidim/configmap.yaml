@@ -1,0 +1,10 @@
+{{- if .Values.multidim.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-multidim-envvar-configmap
+data:
+  {{- range $envKey, $envValue := .Values.multidim.settings.envVars }}
+  {{ upper $envKey }}: {{ $envValue | quote }}
+  {{- end }}
+{{- end }}

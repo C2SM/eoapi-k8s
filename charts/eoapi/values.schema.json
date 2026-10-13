@@ -1,0 +1,1313 @@
+{
+  "$schema": "http://json-schema.org/schema#",
+  "type": "object",
+  "required": [
+    "service"
+  ],
+  "properties": {
+    "gitSha": {
+      "type": "string",
+      "description": "Optional git SHA override for deployment tracking. Published charts inject the release commit at package time; otherwise falls back to chart version."
+    },
+    "serviceAccount": {
+      "type": "object",
+      "properties": {
+        "create": {
+          "type": "boolean",
+          "default": true,
+          "description": "Whether to create a service account"
+        },
+        "name": {
+          "type": "string",
+          "description": "Service account name. If not set and create is true, a name is generated"
+        },
+        "automount": {
+          "type": "boolean",
+          "default": true,
+          "description": "Automatically mount service account token"
+        },
+        "annotations": {
+          "type": "object",
+          "description": "Annotations to add to the service account"
+        },
+        "labels": {
+          "type": "object",
+          "description": "Labels to add to the service account"
+        }
+      }
+    },
+    "rbac": {
+      "type": "object",
+      "description": "Role-based access control configuration",
+      "properties": {
+        "create": {
+          "type": "boolean",
+          "default": true,
+          "description": "Whether to create RBAC resources (Role, RoleBinding, ClusterRole, ClusterRoleBinding). Independent of serviceAccount.create."
+        }
+      }
+    },
+    "service": {
+      "type": "object",
+      "required": [
+        "port"
+      ],
+      "properties": {
+        "port": {
+          "type": "integer",
+          "description": "Service port number"
+        }
+      }
+    },
+    "ingress": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable ingress"
+        },
+        "className": {
+          "type": "string",
+          "enum": [
+            "nginx",
+            "traefik"
+          ],
+          "description": "Supported ingress controller class name (NGINX or Traefik only)"
+        },
+        "entrypoints": {
+          "type": "string",
+          "description": "Traefik only: value for the router entrypoints annotation (e.g. \"websecure\" or \"web,websecure\"). Empty attaches to all entrypoints."
+        },
+        "rootPath": {
+          "type": "string",
+          "description": "Root path for doc server"
+        },
+        "host": {
+          "type": "string",
+          "description": "Ingress host"
+        },
+        "hosts": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Array of multiple ingress host domains array - if specified, takes precedence over single host"
+        },
+        "annotations": {
+          "type": "object",
+          "description": "Additional annotations for ingress"
+        },
+        "tls": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "description": "Enable TLS"
+            },
+            "secretName": {
+              "type": "string",
+              "description": "TLS secret name"
+            }
+          }
+        }
+      }
+    },
+    "postgresql": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": [
+            "postgrescluster",
+            "external-plaintext",
+            "external-secret"
+          ],
+          "description": "PostgreSQL deployment type",
+          "default": "postgrescluster"
+        },
+        "external": {
+          "type": "object",
+          "properties": {
+            "host": {
+              "type": "string",
+              "description": "External PostgreSQL host"
+            },
+            "port": {
+              "type": "string",
+              "description": "External PostgreSQL port"
+            },
+            "database": {
+              "type": "string",
+              "description": "External PostgreSQL database name"
+            },
+            "credentials": {
+              "type": "object",
+              "properties": {
+                "username": {
+                  "type": "string",
+                  "description": "External PostgreSQL username"
+                },
+                "password": {
+                  "type": "string",
+                  "description": "External PostgreSQL password"
+                }
+              }
+            },
+            "existingSecret": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "description": "Name of existing secret"
+                },
+                "keys": {
+                  "type": "object",
+                  "properties": {
+                    "username": {
+                      "type": "string",
+                      "description": "Username key in secret"
+                    },
+                    "password": {
+                      "type": "string",
+                      "description": "Password key in secret"
+                    },
+                    "host": {
+                      "type": "string",
+                      "description": "Host key in secret"
+                    },
+                    "port": {
+                      "type": "string",
+                      "description": "Port key in secret"
+                    },
+                    "database": {
+                      "type": "string",
+                      "description": "Database key in secret"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "postgrescluster": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable PostgreSQL cluster"
+        },
+        "postgresVersion": {
+          "type": "integer",
+          "description": "PostgreSQL version"
+        },
+        "postGISVersion": {
+          "type": "string",
+          "description": "PostGIS version"
+        },
+        "pgBouncerReplicas": {
+          "type": "integer",
+          "description": "Number of PgBouncer replicas"
+        },
+        "monitoring": {
+          "type": "boolean",
+          "description": "Enable monitoring"
+        },
+        "postgresClusterAnnotations": {
+          "type": "object",
+          "description": "Annotations to add to the PostgresCluster resource"
+        },
+        "patroni": {
+          "type": "object",
+          "description": "Patroni configuration"
+        },
+        "databaseInitSQL": {
+          "type": "object",
+          "description": "Database initialization SQL"
+        },
+        "instances": {
+          "type": "array",
+          "description": "PostgreSQL instances configuration"
+        },
+        "users": {
+          "type": "array",
+          "description": "PostgreSQL users configuration"
+        }
+      }
+    },
+    "pgstacBootstrap": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable PgSTAC bootstrap"
+        },
+        "image": {
+          "$ref": "#/definitions/containerImage"
+        },
+        "waitImage": {
+          "$ref": "#/definitions/containerImage"
+        },
+        "configMaps": {
+          "type": "object",
+          "properties": {
+            "pgstacSettings": {
+              "type": "object",
+              "properties": {
+                "annotations": {
+                  "type": "object"
+                }
+              }
+            },
+            "initdbSql": {
+              "type": "object",
+              "properties": {
+                "annotations": {
+                  "type": "object"
+                }
+              }
+            },
+            "initdbJson": {
+              "type": "object",
+              "properties": {
+                "annotations": {
+                  "type": "object"
+                }
+              }
+            },
+            "pgstacQueryables": {
+              "type": "object",
+              "properties": {
+                "annotations": {
+                  "type": "object"
+                }
+              }
+            },
+            "initdb": {
+              "type": "object",
+              "properties": {
+                "annotations": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "jobs": {
+          "type": "object",
+          "properties": {
+            "pgstacSuperuserInitDb": {
+              "type": "object",
+              "properties": {
+                "annotations": {
+                  "type": "object"
+                }
+              }
+            },
+            "pgstacMigrate": {
+              "type": "object",
+              "properties": {
+                "annotations": {
+                  "type": "object"
+                }
+              }
+            },
+            "pgstacLoadSamples": {
+              "type": "object",
+              "properties": {
+                "annotations": {
+                  "type": "object"
+                }
+              }
+            },
+            "pgstacLoadQueryables": {
+              "type": "object",
+              "properties": {
+                "annotations": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "settings": {
+          "type": "object",
+          "properties": {
+            "loadSamples": {
+              "type": "boolean",
+              "description": "Load sample data"
+            },
+            "user": {
+              "type": "string",
+              "description": "Database user"
+            },
+            "database": {
+              "type": "string",
+              "description": "Database name"
+            },
+            "resources": {
+              "type": "object",
+              "description": "Resource requirements"
+            },
+            "pgstacSettings": {
+              "type": "object",
+              "description": "PgSTAC database configuration settings",
+              "properties": {
+                "queue_timeout": {
+                  "type": "string",
+                  "default": "10 minutes",
+                  "description": "Timeout for queued queries (PostgreSQL interval format)"
+                },
+                "use_queue": {
+                  "type": "string",
+                  "enum": [
+                    "true",
+                    "false"
+                  ],
+                  "default": "false",
+                  "description": "Enable/disable query queue mechanism"
+                },
+                "update_collection_extent": {
+                  "type": "string",
+                  "enum": [
+                    "true",
+                    "false"
+                  ],
+                  "default": "true",
+                  "description": "Auto-update collection extents when items are added/modified"
+                },
+                "context": {
+                  "type": "string",
+                  "enum": [
+                    "on",
+                    "off",
+                    "auto"
+                  ],
+                  "default": "off",
+                  "description": "Context mode for search results"
+                },
+                "context_estimated_count": {
+                  "type": "string",
+                  "default": "100000",
+                  "description": "Row threshold for using estimates instead of exact counts"
+                },
+                "context_estimated_cost": {
+                  "type": "string",
+                  "default": "100000",
+                  "description": "Query cost threshold for using estimates"
+                },
+                "context_stats_ttl": {
+                  "type": "string",
+                  "default": "1 day",
+                  "description": "Cache duration for context statistics (PostgreSQL interval)"
+                }
+              }
+            },
+            "queueProcessor": {
+              "type": "object",
+              "description": "Queue processor CronJob configuration (active when use_queue is true)",
+              "properties": {
+                "schedule": {
+                  "type": "string",
+                  "default": "0 * * * *",
+                  "description": "Cron schedule for processing queued queries"
+                }
+              }
+            },
+            "extentUpdater": {
+              "type": "object",
+              "description": "Extent updater CronJob configuration (active when update_collection_extent is false)",
+              "properties": {
+                "schedule": {
+                  "type": "string",
+                  "default": "0 2 * * *",
+                  "description": "Cron schedule for updating collection extents"
+                }
+              }
+            },
+            "queryables": {
+              "type": "array",
+              "description": "List of queryables configurations to load using pypgstac load-queryables",
+              "items": {
+                "type": "object",
+                "required": [
+                  "name"
+                ],
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "description": "Name of the queryables configuration file"
+                  },
+                  "file": {
+                    "type": "string",
+                    "description": "Path to the queryables file relative to the chart directory"
+                  },
+                  "configMapRef": {
+                    "type": "object",
+                    "description": "Reference to an external ConfigMap containing queryables data",
+                    "properties": {
+                      "name": {
+                        "type": "string",
+                        "description": "Name of the ConfigMap"
+                      },
+                      "key": {
+                        "type": "string",
+                        "description": "Key within the ConfigMap containing the queryables data"
+                      }
+                    },
+                    "required": [
+                      "name",
+                      "key"
+                    ]
+                  },
+                  "indexFields": {
+                    "type": "array",
+                    "description": "List of fields to create database indexes for",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "deleteMissing": {
+                    "type": "boolean",
+                    "description": "Whether to delete queryables not present in this configuration"
+                  },
+                  "collections": {
+                    "type": "array",
+                    "description": "List of collection IDs to apply these queryables to",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "oneOf": [
+                  {
+                    "required": [
+                      "file"
+                    ],
+                    "not": {
+                      "required": [
+                        "configMapRef"
+                      ]
+                    }
+                  },
+                  {
+                    "required": [
+                      "configMapRef"
+                    ],
+                    "not": {
+                      "required": [
+                        "file"
+                      ]
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "apiServices": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": [
+          "raster",
+          "multidim",
+          "stac",
+          "vector"
+        ]
+      },
+      "description": "List of API services to enable"
+    },
+    "raster": {
+      "$ref": "#/definitions/apiService"
+    },
+    "multidim": {
+      "$ref": "#/definitions/apiService"
+    },
+    "stac": {
+      "$ref": "#/definitions/apiService"
+    },
+    "vector": {
+      "$ref": "#/definitions/apiService"
+    },
+    "browser": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable STAC browser"
+        },
+        "replicaCount": {
+          "type": "integer",
+          "description": "Number of replicas"
+        },
+        "image": {
+          "$ref": "#/definitions/containerImage"
+        },
+        "ingress": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "description": "Enable ingress for browser"
+            },
+            "path": {
+              "type": "string",
+              "description": "Ingress path prefix for the browser service"
+            }
+          }
+        },
+        "customConfig": {
+          "type": "string",
+          "description": "JS appended after stac-browser's own runtime-config.js is generated, to set fields with no SB_* equivalent (e.g. buildTileUrlTemplate)"
+        },
+        "oidcClientId": {
+          "type": "string",
+          "description": "OAuth2 client ID the browser's own login presents"
+        },
+        "oidcDiscoveryUrl": {
+          "type": "string",
+          "description": "OIDC discovery URL for the browser's login; must be reachable from the user's browser. Required when stac-auth-proxy is enabled"
+        },
+        "oidcScope": {
+          "type": "string",
+          "description": "OIDC scope the browser requests, space-separated. Must match what the provider grants this client or the whole authorization request is rejected"
+        },
+        "oidcLogoutUrl": {
+          "type": "string",
+          "description": "Where 'Log out' ends the identity provider session, for providers advertising no end_session_endpoint (e.g. Authelia). Empty for providers that do"
+        },
+        "oidcSilentRenew": {
+          "type": "boolean",
+          "description": "Serve a silent-renew landing page and point silent_redirect_uri at it; without it background token renewal boots the whole app in a hidden iframe and times out"
+        },
+        "oidcAutoSignIn": {
+          "type": "boolean",
+          "description": "On load with no stored token, ask the provider for one without prompting. Requires oidcSilentRenew"
+        },
+        "authConfig": {
+          "type": "object",
+          "description": "Full override of the SB_authConfig document the chart otherwise builds from browser.oidc*. Set this only to reach an oidc-client-ts setting the oidc* values do not expose"
+        },
+        "favicon": {
+          "type": "string",
+          "description": "Base64-encoded PNG content for a custom favicon, linked into index.html's <head>"
+        },
+        "settings": {
+          "type": "object",
+          "properties": {
+            "resources": {
+              "type": "object",
+              "description": "Resource requirements for browser"
+            }
+          }
+        }
+      }
+    },
+    "narthex-backend": {
+      "type": "object",
+      "description": "narthex-backend: named STAC item lists API (fork-only; see deploy/cscs)",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "description": "Enable narthex-backend"
+        },
+        "image": {
+          "$ref": "#/definitions/containerImage"
+        },
+        "service": {
+          "type": "object",
+          "properties": {
+            "port": {
+              "type": "integer",
+              "description": "Service port"
+            }
+          }
+        },
+        "ingress": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "description": "Enable a chart-managed Ingress for this service"
+            },
+            "path": {
+              "type": "string",
+              "description": "Ingress path prefix for this service"
+            }
+          }
+        },
+        "authMode": {
+          "type": "string",
+          "enum": [
+            "",
+            "dev",
+            "oidc"
+          ],
+          "description": "How the API authenticates callers: 'dev' takes any bearer token as the owner id, 'oidc' validates a JWT against oidcIssuer's JWKS. Empty falls back to the image's own default"
+        },
+        "oidcIssuer": {
+          "type": "string",
+          "description": "OIDC issuer URL whose JWKS validates bearer tokens. Required when authMode is 'oidc'"
+        },
+        "oidcAudiences": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Accepted 'aud' values. Must include every client whose token reaches this API - the narthex SPA and the stac-browser widget are separate clients"
+        },
+        "corsOrigins": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Browser origins allowed to call this API. The SaveToNarthex widget calls it from the stac-browser origin, not narthex's own"
+        },
+        "launchTokenSecretName": {
+          "type": "string",
+          "description": "Secret holding the token used to sign notebook launch handoffs"
+        },
+        "imagePullSecrets": {
+          "type": "array",
+          "description": "imagePullSecrets for a private registry; narthex images are published privately",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "settings": {
+          "type": "object",
+          "properties": {
+            "resources": {
+              "type": "object",
+              "description": "Resource requests and limits for this service"
+            }
+          }
+        }
+      }
+    },
+    "narthex-frontend": {
+      "type": "object",
+      "description": "narthex-frontend: the named-list admin SPA (fork-only; see deploy/cscs)",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "description": "Enable narthex-frontend"
+        },
+        "image": {
+          "$ref": "#/definitions/containerImage"
+        },
+        "service": {
+          "type": "object",
+          "properties": {
+            "port": {
+              "type": "integer",
+              "description": "Service port"
+            }
+          }
+        },
+        "ingress": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "description": "Enable a chart-managed Ingress for this service"
+            },
+            "path": {
+              "type": "string",
+              "description": "Ingress path prefix for this service"
+            }
+          }
+        },
+        "apiUrl": {
+          "type": "string",
+          "description": "Externally reachable narthex-backend URL; the SPA calls it from the browser"
+        },
+        "authMode": {
+          "type": "string",
+          "enum": [
+            "",
+            "dev",
+            "oidc",
+            "proxy"
+          ],
+          "description": "'dev' prompts for a username, 'oidc' runs the SPA's own OIDC client, 'proxy' expects an upstream proxy to inject the token. Empty lets narthex infer it (oidc when oidcIssuer is set, otherwise dev)"
+        },
+        "logoutUrl": {
+          "type": "string",
+          "description": "Where 'Sign out' ends the provider session. Required for providers advertising no end_session_endpoint (e.g. Authelia), or logout only clears local state"
+        },
+        "oidcIssuer": {
+          "type": "string",
+          "description": "OIDC issuer URL. Required when authMode is 'oidc'"
+        },
+        "oidcClientId": {
+          "type": "string",
+          "description": "OAuth2 client ID the SPA presents"
+        },
+        "oidcRedirectUri": {
+          "type": "string",
+          "description": "Must exactly match a redirect URI registered for oidcClientId with the provider"
+        },
+        "oidcScope": {
+          "type": "string",
+          "description": "Space-separated OIDC scopes; empty uses narthex's own default. Must match what the provider grants this client or the whole authorization request is rejected"
+        },
+        "launchConfigs": {
+          "type": "array",
+          "description": "JupyterHub launch targets offered by the SPA. An empty list means none are offered - it is never a fallback to narthex's built-in dev defaults",
+          "items": {
+            "type": "object",
+            "required": [
+              "id",
+              "label",
+              "jupyterHubUrl"
+            ],
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "label": {
+                "type": "string"
+              },
+              "jupyterHubUrl": {
+                "type": "string"
+              },
+              "notebookApp": {
+                "type": "string"
+              },
+              "uenv": {
+                "type": "string"
+              },
+              "venv": {
+                "type": "string"
+              },
+              "notebook": {
+                "type": "string"
+              },
+              "message": {
+                "type": "string",
+                "description": "Plain text shown in an acknowledgement modal before launching; never rendered as HTML"
+              }
+            }
+          }
+        },
+        "imagePullSecrets": {
+          "type": "array",
+          "description": "imagePullSecrets for a private registry; narthex images are published privately",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "settings": {
+          "type": "object",
+          "properties": {
+            "resources": {
+              "type": "object",
+              "description": "Resource requests and limits for this service"
+            }
+          }
+        }
+      }
+    },
+    "docServer": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable documentation server"
+        },
+        "redirectTo": {
+          "type": "string",
+          "default": "",
+          "description": "When set, root path / redirects to this URL instead of showing the landing page (e.g. /browser/)"
+        },
+        "image": {
+          "$ref": "#/definitions/containerImage"
+        },
+        "settings": {
+          "type": "object",
+          "properties": {
+            "resources": {
+              "type": "object",
+              "description": "Resource requirements for doc server"
+            }
+          }
+        }
+      }
+    },
+    "eoapi-notifier": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "default": false,
+          "description": "Enable eoAPI notifier for database notifications to CloudEvents"
+        },
+        "sources": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "description": "Source type (e.g., pgstac)"
+              },
+              "config": {
+                "type": "object",
+                "description": "Source-specific configuration"
+              }
+            }
+          },
+          "description": "Notification source configurations"
+        },
+        "outputs": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "description": "Output type (e.g., cloudevents, mqtt)"
+              },
+              "config": {
+                "type": "object",
+                "description": "Output-specific configuration"
+              }
+            }
+          },
+          "description": "Notification output configurations"
+        },
+        "config": {
+          "type": "object",
+          "properties": {
+            "logLevel": {
+              "type": "string",
+              "enum": [
+                "DEBUG",
+                "INFO",
+                "WARNING",
+                "ERROR"
+              ],
+              "default": "INFO",
+              "description": "Log level for eoapi-notifier"
+            },
+            "filters": {
+              "type": "array",
+              "description": "Optional event filters applied before output fan-out (OR between blocks, AND within each block)",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "collections": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "description": "Restrict forwarding to these collection IDs"
+                  },
+                  "operations": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "enum": [
+                        "create",
+                        "replace",
+                        "delete"
+                      ]
+                    },
+                    "description": "Restrict forwarding to these operations"
+                  },
+                  "bbox": {
+                    "type": "array",
+                    "items": {
+                      "type": "number"
+                    },
+                    "minItems": 4,
+                    "maxItems": 4,
+                    "description": "Restrict forwarding to items overlapping this bounding box [west, south, east, north]"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "secrets": {
+          "type": "object",
+          "properties": {
+            "postgresql": {
+              "type": "object",
+              "properties": {
+                "create": {
+                  "type": "boolean",
+                  "description": "Create PostgreSQL secret"
+                }
+              }
+            }
+          }
+        },
+        "env": {
+          "type": "object",
+          "description": "Environment variables for eoapi-notifier"
+        },
+        "envFrom": {
+          "type": "array",
+          "description": "Environment variables from references"
+        },
+        "resources": {
+          "type": "object",
+          "description": "Resource requirements for eoapi-notifier"
+        }
+      }
+    },
+    "stac-auth-proxy": {
+      "type": "object",
+      "description": "STAC Auth Proxy subchart (authentication layer for STAC API)",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "description": "Enable the stac-auth-proxy subchart"
+        },
+        "autoscaling": {
+          "type": "object",
+          "description": "CPU-based HPA (rendered by stac-auth-proxy subchart)",
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "description": "Enable Horizontal Pod Autoscaler for the auth proxy"
+            },
+            "minReplicas": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "Minimum number of proxy replicas"
+            },
+            "maxReplicas": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "Maximum number of proxy replicas"
+            },
+            "targetCPUUtilizationPercentage": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "description": "Target CPU utilization percentage for autoscaling"
+            },
+            "behavior": {
+              "type": "object",
+              "description": "HPA scaling behavior configuration"
+            }
+          }
+        },
+        "resources": {
+          "type": "object",
+          "description": "Resource requests and limits for the auth proxy"
+        }
+      }
+    },
+    "testing": {
+      "type": "object",
+      "description": "Test infrastructure components - DO NOT USE IN PRODUCTION",
+      "properties": {
+        "mockOidcServer": {
+          "type": "object",
+          "description": "Mock OIDC server for testing stac-auth-proxy integration",
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "description": "Enable mock OIDC server"
+            },
+            "image": {
+              "$ref": "#/definitions/containerImage"
+            },
+            "ingress": {
+              "type": "object",
+              "properties": {
+                "enabled": {
+                  "type": "boolean",
+                  "description": "Expose mock OIDC server via unified ingress"
+                },
+                "path": {
+                  "type": "string",
+                  "description": "Ingress path prefix for the mock OIDC server"
+                }
+              }
+            },
+            "service": {
+              "type": "object",
+              "properties": {
+                "port": {
+                  "type": "integer",
+                  "description": "Service port for the mock OIDC server"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "knative": {
+      "type": "object",
+      "description": "Optional Knative components for CloudEvents and serverless workloads",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "description": "Enable Knative components"
+        },
+        "cloudEventsSink": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "description": "Enable CloudEvents sink"
+            },
+            "image": {
+              "$ref": "#/definitions/containerImage"
+            }
+          }
+        },
+        "jobs": {
+          "type": "object",
+          "properties": {
+            "init": {
+              "type": "object",
+              "properties": {
+                "image": {
+                  "$ref": "#/definitions/containerImage"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "prometheus": {
+      "type": "object",
+      "description": "Values passed to the prometheus Helm sub-chart",
+      "properties": {
+        "alertmanager": {
+          "type": "object",
+          "additionalProperties": true
+        },
+        "kube-state-metrics": {
+          "type": "object",
+          "additionalProperties": true
+        },
+        "prometheus-node-exporter": {
+          "type": "object",
+          "additionalProperties": true
+        },
+        "prometheus-pushgateway": {
+          "type": "object",
+          "additionalProperties": true
+        },
+        "server": {
+          "type": "object",
+          "additionalProperties": true
+        }
+      },
+      "additionalProperties": true
+    },
+    "prometheus-adapter": {
+      "type": "object",
+      "description": "Values passed to the prometheus-adapter Helm sub-chart",
+      "properties": {
+        "prometheus": {
+          "type": "object",
+          "properties": {
+            "url": {
+              "type": "string",
+              "description": "Prometheus server URL for custom metrics queries"
+            },
+            "port": {
+              "type": "integer",
+              "description": "Prometheus server port"
+            },
+            "path": {
+              "type": "string",
+              "description": "Prometheus server path prefix"
+            }
+          },
+          "additionalProperties": true
+        },
+        "rules": {
+          "type": "object",
+          "properties": {
+            "default": {
+              "type": "boolean",
+              "description": "Enable default prometheus-adapter resource rules"
+            },
+            "custom": {
+              "type": "array",
+              "description": "Custom metrics rules. name.as must match eoapi.hpaRequestRateMetricName per apiServices entry.",
+              "items": {
+                "type": "object",
+                "additionalProperties": true
+              }
+            }
+          },
+          "additionalProperties": true
+        },
+        "resources": {
+          "type": "object",
+          "description": "Resource requests and limits for prometheus-adapter"
+        }
+      },
+      "additionalProperties": true
+    }
+  },
+  "definitions": {
+    "apiService": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "description": "Enable the service"
+        },
+        "ingress": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "description": "Enable ingress for this service"
+            },
+            "path": {
+              "type": "string",
+              "description": "Ingress path prefix for this service"
+            }
+          }
+        },
+        "autoscaling": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "description": "Enable autoscaling"
+            },
+            "minReplicas": {
+              "type": "integer",
+              "description": "Minimum number of replicas"
+            },
+            "maxReplicas": {
+              "type": "integer",
+              "description": "Maximum number of replicas"
+            },
+            "type": {
+              "type": "string",
+              "enum": [
+                "cpu",
+                "requestRate",
+                "both"
+              ],
+              "description": "Autoscaling metric type"
+            },
+            "behavior": {
+              "type": "object",
+              "description": "Autoscaling behavior configuration"
+            },
+            "targets": {
+              "type": "object",
+              "properties": {
+                "cpu": {
+                  "type": "integer",
+                  "description": "CPU utilization target"
+                },
+                "requestRate": {
+                  "type": "string",
+                  "description": "Request rate target"
+                }
+              }
+            }
+          }
+        },
+        "image": {
+          "$ref": "#/definitions/containerImage"
+        },
+        "command": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Container command"
+        },
+        "overrideRootPath": {
+          "type": "string",
+          "description": "Override root path for this service"
+        },
+        "settings": {
+          "type": "object",
+          "properties": {
+            "labels": {
+              "type": "object",
+              "description": "Additional pod labels"
+            },
+            "resources": {
+              "type": "object",
+              "description": "Resource requirements"
+            },
+            "extraEnvFrom": {
+              "type": "array",
+              "description": "Additional environment variables from references"
+            },
+            "extraVolumeMounts": {
+              "type": "array",
+              "description": "Additional volume mounts"
+            },
+            "extraVolumes": {
+              "type": "array",
+              "description": "Additional volumes"
+            },
+            "envVars": {
+              "type": "object",
+              "description": "Environment variables"
+            }
+          }
+        }
+      }
+    },
+    "containerImage": {
+      "type": "object",
+      "description": "Container image reference. Prefer digest over tag when pinning immutable images.",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Image name (registry/repository)"
+        },
+        "tag": {
+          "type": "string",
+          "description": "Image tag (ignored when digest is set)"
+        },
+        "digest": {
+          "type": "string",
+          "description": "Optional image digest (sha256:...). When set, overrides tag. Refresh when upgrading."
+        },
+        "pullPolicy": {
+          "type": "string",
+          "description": "Container image pull policy",
+          "default": "IfNotPresent",
+          "enum": [
+            "Always",
+            "IfNotPresent",
+            "Never"
+          ]
+        }
+      }
+    }
+  }
+}

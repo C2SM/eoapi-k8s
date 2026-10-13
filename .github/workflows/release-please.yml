@@ -1,0 +1,71 @@
+on:
+  push:
+    branches:
+      - main
+  release:
+    types: [published]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+name: release-eoapi
+
+env:
+  HELM_VERSION: v3.18.3
+
+jobs:
+  release-please:
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    outputs:
+      release_created: ${{ steps.release.outputs.release_created }}
+    steps:
+      - uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        id: app-token
+        with:
+          app-id: ${{ secrets.DS_RELEASE_BOT_ID }}
+          private-key: ${{ secrets.DS_RELEASE_BOT_PRIVATE_KEY }}
+
+      - uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5
+        id: release
+        with:
+          token: ${{ steps.app-token.outputs.token }}
+
+  publish:
+    if: github.event_name == 'release'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+
+      - name: Configure git
+        run: |
+          git config user.name "${{ github.actor }}"
+          git config user.email "${{ github.actor }}@users.noreply.github.com"
+
+      - uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5
+        with:
+          version: ${{ env.HELM_VERSION }}
+
+      - name: Add Helm repos
+        run: |
+          helm repo add eoapi https://devseed.com/eoapi-k8s/
+          helm repo add knative https://knative.github.io/operator
+          helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+          helm repo add grafana https://grafana.github.io/helm-charts
+          helm repo add metrics-server https://kubernetes-sigs.github.io/metrics-server/
+          helm repo list
+
+      - name: Inject git SHA into eoapi chart
+        run: bash scripts/inject-chart-git-sha.sh charts/eoapi/values.yaml
+
+      - name: Run chart-releaser
+        uses: helm/chart-releaser-action@cae68fefc6b5f367a0275617c9f83181ba54714f # v1.7.0
+        with:
+          charts_dir: charts
+        env:
+          CR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CR_SKIP_EXISTING: true
+          CR_INDEX_PATH: "."

@@ -1,0 +1,405 @@
+# eoAPI Experimental Profile
+# All services and experimental features enabled
+# Includes: All core services + Multidim, STAC Browser, Notifications, Knative, Monitoring
+# WARNING: This profile is for development/testing. Not recommended for production.
+#
+# Usage:
+#   helm install eoapi ./charts/eoapi -f profiles/experimental.yaml
+#   helm upgrade eoapi ./charts/eoapi -f profiles/experimental.yaml
+
+######################
+# DATABASE
+######################
+# Database configuration optimized for development
+postgresql:
+  type: "postgrescluster"
+
+postgrescluster:
+  enabled: true
+  postgresVersion: 16
+  postGISVersion: "3.4"
+  pgBouncerReplicas: 1
+  monitoring: false
+  patroni:
+    dynamicConfiguration:
+      postgresql:
+        pg_hba:
+          - "host all all 0.0.0.0/0 md5"
+        parameters:
+          shared_preload_libraries: pg_stat_statements, auto_explain
+  databaseInitSQL:
+    key: initdb.sql
+    name: initdb
+  instances:
+    - name: eoapi
+      replicas: 1
+      dataVolumeClaimSpec:
+        accessModes:
+          - "ReadWriteOnce"
+        resources:
+          requests:
+            storage: "5Gi"
+      resources: {}
+  users:
+    - name: postgres
+      databases:
+        - eoapi
+        - postgres
+      options: "SUPERUSER"
+    - name: eoapi
+      databases:
+        - eoapi
+        - postgres
+      options: "CREATEDB CREATEROLE"
+      password:
+        type: AlphaNumeric
+
+######################
+# PGSTAC BOOTSTRAP
+######################
+pgstacBootstrap:
+  enabled: true
+  settings:
+    # Enable sample data loading for testing
+    loadSamples: true
+
+    # Queryables configuration for testing
+    queryables:
+      - name: test-queryables.json
+        file: "data/initdb/queryables/test-queryables.json"
+        indexFields: ["platform", "instruments"]
+        deleteMissing: true
+
+    # PgSTAC settings optimized for development
+    pgstacSettings:
+      queue_timeout: "10 minutes"
+      use_queue: "false"
+      update_collection_extent: "true"
+
+    resources: {}
+
+    envVars:
+      LOAD_FIXTURES: "true"
+
+######################
+# ALL API SERVICES
+######################
+stac:
+  enabled: true
+  ingress:
+    enabled: true
+    path: "/stac"
+  autoscaling:
+    enabled: true
+    type: "cpu"
+    minReplicas: 1
+    maxReplicas: 3
+    targets:
+      cpu: 75
+  settings:
+    resources:
+      requests:
+        cpu: "50m"
+    envVars:
+      HOST: "0.0.0.0"
+      PORT: "8080"
+      ENABLE_TRANSACTIONS_EXTENSIONS: "true"
+      WEB_CONCURRENCY: "5"
+      STAC_FASTAPI_DEBUG: "True"
+      STAC_FASTAPI_CORS_ORIGINS: "*"
+
+raster:
+  enabled: true
+  ingress:
+    enabled: true
+    path: "/raster"
+  autoscaling:
+    enabled: true
+    type: "cpu"
+    minReplicas: 1
+    maxReplicas: 3
+    targets:
+      cpu: 75
+  settings:
+    resources:
+      requests:
+        cpu: "50m"
+    envVars:
+      # GDAL performance settings
+      GDAL_CACHEMAX: "200"
+      GDAL_DISABLE_READDIR_ON_OPEN: "EMPTY_DIR"
+      GDAL_INGESTED_BYTES_AT_OPEN: "32768"
+      GDAL_HTTP_MERGE_CONSECUTIVE_RANGES: "YES"
+      GDAL_HTTP_MULTIPLEX: "YES"
+      GDAL_HTTP_VERSION: "2"
+      PYTHONWARNINGS: "ignore"
+      VSI_CACHE: "TRUE"
+      VSI_CACHE_SIZE: "5000000"
+      # Uvicorn settings
+      HOST: "0.0.0.0"
+      PORT: "8080"
+      WEB_CONCURRENCY: "5"
+      # Debug mode for development
+      TITILER_DEBUG: "True"
+
+vector:
+  enabled: true
+  ingress:
+    enabled: true
+    path: "/vector"
+  autoscaling:
+    enabled: true
+    type: "cpu"
+    minReplicas: 1
+    maxReplicas: 3
+    targets:
+      cpu: 75
+  settings:
+    resources:
+      requests:
+        cpu: "50m"
+    envVars:
+      TIPG_CATALOG_TTL: "300"
+      TIPG_DEBUG: "True"
+      HOST: "0.0.0.0"
+      PORT: "8080"
+      WEB_CONCURRENCY: "5"
+
+multidim:
+  enabled: true
+  ingress:
+    enabled: true
+    path: "/multidim"
+  autoscaling:
+    enabled: true
+    type: "cpu"
+    minReplicas: 1
+    maxReplicas: 3
+    targets:
+      cpu: 75
+  settings:
+    resources:
+      requests:
+        cpu: "50m"
+    envVars:
+      GDAL_CACHEMAX: "200"
+      GDAL_DISABLE_READDIR_ON_OPEN: "EMPTY_DIR"
+      GDAL_INGESTED_BYTES_AT_OPEN: "32768"
+      GDAL_HTTP_MERGE_CONSECUTIVE_RANGES: "YES"
+      GDAL_HTTP_MULTIPLEX: "YES"
+      GDAL_HTTP_VERSION: "2"
+      PYTHONWARNINGS: "ignore"
+      VSI_CACHE: "TRUE"
+      VSI_CACHE_SIZE: "5000000"
+      HOST: "0.0.0.0"
+      PORT: "8080"
+      WEB_CONCURRENCY: "5"
+
+######################
+# UI COMPONENTS
+######################
+browser:
+  enabled: true
+  settings:
+    resources: {}
+  # STAC Browser needs external OIDC URL (accessible from user's browser)
+  oidcDiscoveryUrl: "http://localhost/mock-oidc/.well-known/openid-configuration"
+
+docServer:
+  enabled: true
+
+######################
+# NOTIFICATIONS
+######################
+eoapi-notifier:
+  enabled: true
+  waitForKnativeCRDs: false
+  config:
+    logLevel: DEBUG
+    sources:
+      - type: pgstac
+        config:
+          channel: pgstac_items_change
+          connection:
+            existingSecret:
+              name: ""  # Set dynamically by deploy script
+              keys:
+                username: "user"
+                password: "password"
+                host: "host"
+                port: "port"
+                database: "dbname"
+    outputs:
+      - type: cloudevents
+        config:
+          source: /eoapi/pgstac
+          destination:
+            ref:
+              apiVersion: serving.knative.dev/v1
+              kind: Service
+              name: eoapi-cloudevents-sink
+  resources: {}
+
+######################
+# KNATIVE
+######################
+knative:
+  enabled: true
+  version: "1.21"
+  initTimeout: "600s"
+  cloudEventsSink:
+    enabled: true
+    resources: {}
+
+knative-operator:
+  tag: "v1.21.0"
+  resources: {}
+
+######################
+# MONITORING
+######################
+monitoring:
+  metricsServer:
+    enabled: true
+    apiService:
+      create: true
+
+  prometheus:
+    enabled: true
+
+  prometheusAdapter:
+    enabled: true
+
+prometheus:
+  alertmanager:
+    enabled: false
+  prometheus-pushgateway:
+    enabled: false
+  kube-state-metrics:
+    enabled: true
+  prometheus-node-exporter:
+    enabled: true
+    resources: {}
+  server:
+    service:
+      type: ClusterIP
+
+######################
+# OBSERVABILITY
+######################
+observability:
+  grafana:
+    enabled: true
+    persistence:
+      enabled: false
+    service:
+      type: ClusterIP
+    resources:
+      limits:
+        cpu: "100m"
+        memory: "200Mi"
+      requests:
+        cpu: "50m"
+        memory: "100Mi"
+    datasources:
+      datasources.yaml:
+        apiVersion: 1
+        datasources:
+          - name: Prometheus
+            type: prometheus
+            url: "http://{{ .Release.Name }}-prometheus-server"
+            access: proxy
+            isDefault: true
+    dashboardsConfigMaps:
+      default: "{{ .Release.Name }}-dashboards"
+
+######################
+# AUTOSCALING
+######################
+autoscaling:
+  enabled: true
+
+######################
+# INGRESS
+######################
+ingress:
+  enabled: true
+  className: "nginx"
+  host: "localhost"
+  tls:
+    enabled: false
+
+stac-auth-proxy:
+  enabled: true
+  # For testing this will be set dynamically; for production, point to your OIDC server
+  env:
+    # OIDC_DISCOVERY_URL: "http://eoapi-mock-oidc-server.eoapi.svc.cluster.local:8080/.well-known/openid-configuration"
+    # Custom filter classes
+    COLLECTIONS_FILTER_CLS: "stac_auth_proxy.custom_filters:CollectionsFilter"
+    ITEMS_FILTER_CLS: "stac_auth_proxy.custom_filters:ItemsFilter"
+
+  # Custom filters configuration
+  customFiltersFile: "data/stac-auth-proxy/custom_filters.py"
+
+  extraVolumes:
+    - name: filters
+      configMap:
+        name: eoapi-stac-auth-proxy-custom-filters
+
+  extraVolumeMounts:
+    - name: filters
+      mountPath: /app/src/stac_auth_proxy/custom_filters.py
+      subPath: custom_filters.py
+      readOnly: true
+
+######################
+# TESTING INFRASTRUCTURE
+######################
+# Components for testing only - DO NOT USE IN PRODUCTION
+testing:
+  mockOidcServer:
+    enabled: true
+    replicaCount: 1
+    image:
+      name: ghcr.io/alukach/mock-oidc-server
+      digest: sha256:5972adac0b6e3a094ea043be0f1851c65e3fd54e17a546f0b71dedd17c7a2d6a
+      pullPolicy: IfNotPresent
+    port: 8888
+    clientId: "test-client"
+    clientSecret: "test-secret"
+    extraEnv:
+      - name: ISSUER
+        value: "http://localhost/mock-oidc"
+    service:
+      type: ClusterIP
+      port: 8080
+    ingress:
+      enabled: true
+      path: "/mock-oidc"
+    resources:
+      limits:
+        cpu: 100m
+        memory: 128Mi
+      requests:
+        cpu: 50m
+        memory: 64Mi
+    nodeSelector: {}
+    tolerations: []
+    affinity: {}
+    imagePullSecrets: []
+
+######################
+# SERVICE
+######################
+service:
+  port: 8080
+
+serviceAccount:
+  create: true
+  name: ""
+  automount: true
+
+database:
+  enabled: true
+  connectionPooling:
+    enabled: false

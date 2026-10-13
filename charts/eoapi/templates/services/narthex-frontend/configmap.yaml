@@ -1,0 +1,16 @@
+{{- if index .Values "narthex-frontend" "enabled" }}
+{{- $nf := index .Values "narthex-frontend" }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-narthex-launch-configs
+  labels:
+    {{- include "eoapi.labels" . | nindent 4 }}
+    app.kubernetes.io/component: narthex-frontend
+data:
+  # Mounted at NARTHEX_LAUNCH_CONFIGS_FILE and converted to JSON by the
+  # container's own entrypoint (narthex frontend/docker-entrypoint.d/) - see
+  # deployment.yaml.
+  launch-configs.yaml: |
+    {{- toYaml ($nf.launchConfigs | default list) | nindent 4 }}
+{{- end }}

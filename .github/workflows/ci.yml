@@ -1,0 +1,139 @@
+name: CI tests
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+env:
+  HELM_VERSION: v3.18.3
+  PGO_VERSION: "5.8.6"
+
+jobs:
+  fast-checks:
+    name: Simple tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: '24'
+
+      - name: Install Helm
+        uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5
+        with:
+          version: ${{ env.HELM_VERSION }}
+
+      - name: Run linters
+        run: ./eoapi-cli test lint
+
+      - name: Validate Helm values schema
+        run: ./eoapi-cli test schema
+
+      - name: Check app version consistency
+        run: |
+          CHART_VERSION=$(yq '.appVersion' charts/eoapi/Chart.yaml)
+          IMAGE_TAG=$(yq '.stac.image.tag' charts/eoapi/values.yaml)
+          if [ "$CHART_VERSION" != "$IMAGE_TAG" ]; then
+            echo "Version mismatch: Chart.yaml appVersion ($CHART_VERSION) != values.yaml stac.image.tag ($IMAGE_TAG)"
+            exit 1
+          fi
+
+      - name: Run Helm unit tests
+        run: |
+          helm repo add eoapi-k8s https://devseed.com/eoapi-k8s/
+          helm repo add knative https://knative.github.io/operator
+          helm repo add metrics-server https://kubernetes-sigs.github.io/metrics-server/
+          helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+          helm repo add grafana https://grafana.github.io/helm-charts
+          helm repo update
+          helm dependency build charts/eoapi
+          helm plugin install https://github.com/helm-unittest/helm-unittest
+          helm unittest charts/eoapi -f 'tests/*_test.yaml' -f 'tests/*_tests.yaml' --color
+
+      - name: Test gitSha injection script
+        run: ./eoapi-cli test gitsha
+
+      - name: Check container images for root user
+        run: ./eoapi-cli test images
+
+  integration-tests:
+    name: Integration tests
+    needs: fast-checks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.14'
+
+      - name: Install Helm
+        uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5
+        with:
+          version: ${{ env.HELM_VERSION }}
+
+      - name: Set release name
+        run: echo "RELEASE_NAME=eoapi-${GITHUB_SHA::8}" >> "$GITHUB_ENV"
+
+      - name: Clean up disk space
+        run: |
+          echo "=== Disk space before cleanup ==="
+          df -h
+          echo "=== Docker cleanup ==="
+          docker system prune -af --volumes || true
+          echo "=== Remove unused packages ==="
+          sudo apt-get clean || true
+          sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/share/boost "$AGENT_TOOLSDIRECTORY" || true
+          echo "=== Disk space after cleanup ==="
+          df -h
+
+      - name: Start K3s cluster
+        uses: jupyterhub/action-k3s-helm@502a9ff4d816dad543e359971fe2c3128d0f4c6e # v4
+        with:
+          k3s-channel: latest
+          metrics-enabled: true
+          docker-enabled: true
+
+      - name: Wait until cluster is ready
+        run: ./eoapi-cli cluster wait-ready
+
+      - name: Inject git SHA for deployment tracking
+        run: bash scripts/inject-chart-git-sha.sh charts/eoapi/values.yaml
+
+      - name: Deploy eoAPI
+        run: ./eoapi-cli deployment run --profile k3d
+
+      - name: Run integration tests
+        run: ./eoapi-cli test integration
+
+      - name: Run notification tests
+        run: ./eoapi-cli test notification
+
+      - name: Debug failed deployment
+        if: failure()
+        run: ./eoapi-cli deployment debug
+
+      - name: Cleanup
+        if: always()
+        run: |
+          echo "=== Cleaning up Helm release and namespace ==="
+          helm uninstall "$RELEASE_NAME" -n eoapi || true
+          kubectl delete namespace eoapi || true
+          echo "=== Cleaning up Docker resources ==="
+          docker system prune -af --volumes || true
+
+  validate-docs:
+    name: Validate documentation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: '24'
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.14'
+
+      - name: Check documentation
+        run: ./eoapi-cli docs check

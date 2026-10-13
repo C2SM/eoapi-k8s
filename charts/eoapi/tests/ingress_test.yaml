@@ -1,0 +1,587 @@
+suite: unified ingress tests
+templates:
+  - templates/_helpers/networking.tpl
+  - templates/networking/ingress.yaml
+tests:
+  - it: "should not create ingress when all services disabled"
+    template: templates/networking/ingress.yaml
+    set:
+      ingress.enabled: true
+      ingress.className: "nginx"
+      raster.enabled: false
+      stac.enabled: false
+      vector.enabled: false
+      multidim.enabled: false
+      testing.mockOidcServer.enabled: false
+      docServer.enabled: false
+      browser.enabled: false
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: "stac-only deployment at root path with nginx"
+    template: templates/networking/ingress.yaml
+    set:
+      ingress.enabled: true
+      ingress.className: "nginx"
+      raster.enabled: false
+      stac.enabled: true
+      stac.ingress.enabled: true
+      stac.ingress.path: "/"
+      vector.enabled: false
+      multidim.enabled: false
+      testing.mockOidcServer.enabled: false
+      docServer.enabled: false
+      browser.enabled: false
+    asserts:
+      - isKind:
+          of: Ingress
+      - equal:
+          path: metadata.name
+          value: RELEASE-NAME-ingress
+      - equal:
+          path: spec.rules[0].http.paths[0].path
+          value: "/"
+      - equal:
+          path: spec.rules[0].http.paths[0].pathType
+          value: "Prefix"
+      - equal:
+          path: spec.rules[0].http.paths[0].backend.service.name
+          value: RELEASE-NAME-stac
+
+  - it: "stac-only deployment at root path with traefik"
+    template: templates/networking/ingress.yaml
+    set:
+      ingress.enabled: true
+      ingress.className: "traefik"
+      raster.enabled: false
+      stac.enabled: true
+      stac.ingress.enabled: true
+      stac.ingress.path: "/"
+      vector.enabled: false
+      multidim.enabled: false
+      browser.enabled: false
+    asserts:
+      - isKind:
+          of: Ingress
+      - equal:
+          path: spec.rules[0].http.paths[0].path
+          value: "/"
+      - equal:
+          path: spec.rules[0].http.paths[0].pathType
+          value: "Prefix"
+      - equal:
+          path: spec.ingressClassName
+          value: "traefik"
+
+  - it: "vector ingress with nginx controller"
+    template: templates/networking/ingress.yaml
+    set:
+      ingress.className: "nginx"
+      ingress.annotations:
+        nginx.ingress.kubernetes.io/enable-cors: "true"
+        nginx.ingress.kubernetes.io/enable-access-log: "true"
+      raster.enabled: false
+      stac.enabled: false
+      vector.enabled: true
+      multidim.enabled: false
+      browser.enabled: false
+    asserts:
+      - isKind:
+          of: Ingress
+      - equal:
+          path: spec.rules[0].http.paths[0].path
+          value: "/vector(/|$)(.*)"
+      - equal:
+          path: spec.rules[0].http.paths[0].pathType
+          value: "ImplementationSpecific"
+      - equal:
+          path: metadata.annotations
+          value:
+            nginx.ingress.kubernetes.io/enable-access-log: "true"
+            nginx.ingress.kubernetes.io/enable-cors: "true"
+            nginx.ingress.kubernetes.io/rewrite-target: /$2
+            nginx.ingress.kubernetes.io/use-regex: "true"
+      - equal:
+          path: spec.ingressClassName
+          value: "nginx"
+
+  - it: "raster ingress with traefik controller"
+    template: templates/networking/ingress.yaml
+    set:
+      ingress.className: "traefik"
+      ingress.host: "eoapi.local"
+      raster.enabled: true
+      stac.enabled: false
+      vector.enabled: false
+      multidim.enabled: false
+      browser.enabled: false
+    asserts:
+      - isKind:
+          of: Ingress
+      - equal:
+          path: spec.rules[0].http.paths[0].path
+          value: "/raster"
+      - equal:
+          path: spec.rules[0].http.paths[0].pathType
+          value: "Prefix"
+      - equal:
+          path: metadata.annotations
+          value:
+            traefik.ingress.kubernetes.io/router.middlewares: NAMESPACE-RELEASE-NAME-strip-prefix-middleware@kubernetescrd
+      - equal:
+          path: spec.ingressClassName
+          value: "traefik"
+      - equal:
+          path: spec.rules[0].host
+          value: "eoapi.local"
+
+  - it: "traefik ingress emits entrypoints when configured"
+    template: templates/networking/ingress.yaml
+    set:
+      ingress.className: "traefik"
+      ingress.entrypoints: "websecure"
+      ingress.host: "eoapi.local"
+      raster.enabled: true
+      stac.enabled: false
+      vector.enabled: false
+      multidim.enabled: false
+      browser.enabled: false
+    asserts:
+      - isKind:
+          of: Ingress
+      - equal:
+          path: metadata.annotations
+          value:
+            traefik.ingress.kubernetes.io/router.entrypoints: websecure
+            traefik.ingress.kubernetes.io/router.middlewares: NAMESPACE-RELEASE-NAME-strip-prefix-middleware@kubernetescrd
+
+  - it: "traefik ingress quotes entrypoints annotation values"
+    template: templates/networking/ingress.yaml
+    set:
+      ingress.className: "traefik"
+      ingress.entrypoints: "true"
+      ingress.host: "eoapi.local"
+      raster.enabled: true
+      stac.enabled: false
+      vector.enabled: false
+      multidim.enabled: false
+      browser.enabled: false
+    asserts:
+      - isKind:
+          of: Ingress
+      - equal:
+          path: metadata.annotations
+          value:
+            traefik.ingress.kubernetes.io/router.entrypoints: "true"
+            traefik.ingress.kubernetes.io/router.middlewares: NAMESPACE-RELEASE-NAME-strip-prefix-middleware@kubernetescrd
+
+  - it: "traefik ingress annotations override configured entrypoints"
+    template: templates/networking/ingress.yaml
+    set:
+      ingress.className: "traefik"
+      ingress.entrypoints: "websecure"
+      ingress.annotations:
+        traefik.ingress.kubernetes.io/router.entrypoints: web
+      ingress.host: "eoapi.local"
+      raster.enabled: true
+      stac.enabled: false
+      vector.enabled: false
+      multidim.enabled: false
+      browser.enabled: false
+    asserts:
+      - isKind:
+          of: Ingress
+      - equal:
+          path: metadata.annotations
+          value:
+            traefik.ingress.kubernetes.io/router.entrypoints: web
+            traefik.ingress.kubernetes.io/router.middlewares: NAMESPACE-RELEASE-NAME-strip-prefix-middleware@kubernetescrd
+
+  - it: "traefik custom router annotations override generated defaults"
+    template: templates/networking/ingress.yaml
+    set:
+      ingress.className: "traefik"
+      ingress.entrypoints: "web"
+      ingress.host: "eoapi.local"
+      ingress.annotations:
+        traefik.ingress.kubernetes.io/router.entrypoints: "websecure"
+        traefik.ingress.kubernetes.io/router.tls: "true"
+        traefik.ingress.kubernetes.io/router.middlewares: "NAMESPACE-RELEASE-NAME-strip-prefix-middleware@kubernetescrd,NAMESPACE-extra-ipallowlist@kubernetescrd"
+      raster.enabled: true
+      stac.enabled: false
+      vector.enabled: false
+      multidim.enabled: false
+      browser.enabled: false
+    asserts:
+      - isKind:
+          of: Ingress
+      - equal:
+          path: metadata.annotations
+          value:
+            traefik.ingress.kubernetes.io/router.entrypoints: "websecure"
+            traefik.ingress.kubernetes.io/router.tls: "true"
+            traefik.ingress.kubernetes.io/router.middlewares: "NAMESPACE-RELEASE-NAME-strip-prefix-middleware@kubernetescrd,NAMESPACE-extra-ipallowlist@kubernetescrd"
+
+  - it: "all services enabled with custom paths"
+    template: templates/networking/ingress.yaml
+    set:
+      ingress.className: "nginx"
+      raster.enabled: true
+      raster.ingress.path: "/titiler"
+      stac.enabled: true
+      stac.ingress.path: "/stac"
+      vector.enabled: true
+      vector.ingress.path: "/features"
+      multidim.enabled: false
+      browser.enabled: true
+      browser.ingress.path: "/browser"
+    asserts:
+      - isKind:
+          of: Ingress
+      - equal:
+          path: spec.rules[0].http.paths[0].path
+          value: "/stac(/|$)(.*)"
+      - equal:
+          path: spec.rules[0].http.paths[1].path
+          value: "/titiler(/|$)(.*)"
+      - equal:
+          path: spec.rules[0].http.paths[2].path
+          value: "/features(/|$)(.*)"
+      - equal:
+          path: spec.rules[0].http.paths[3].path
+          value: "/browser(/|$)(.*)"
+      - equal:
+          path: spec.rules[0].http.paths[0].pathType
+          value: "ImplementationSpecific"
+
+  - it: "multiple hosts with services"
+    template: templates/networking/ingress.yaml
+    set:
+      ingress.className: "nginx"
+      ingress.hosts:
+        - "api.eoapi.dev"
+        - "backup.eoapi.dev"
+      raster.enabled: true
+      stac.enabled: true
+      vector.enabled: true
+      multidim.enabled: false
+      browser.enabled: false
+    asserts:
+      - isKind:
+          of: Ingress
+      - equal:
+          path: spec.rules[0].host
+          value: "api.eoapi.dev"
+      - equal:
+          path: spec.rules[1].host
+          value: "backup.eoapi.dev"
+      - equal:
+          path: spec.rules[0].http.paths[0].path
+          value: "/stac(/|$)(.*)"
+      - equal:
+          path: spec.rules[0].http.paths[1].path
+          value: "/raster(/|$)(.*)"
+      - equal:
+          path: spec.rules[0].http.paths[2].path
+          value: "/vector(/|$)(.*)"
+
+  - it: "tls enabled with multiple hosts"
+    template: templates/networking/ingress.yaml
+    set:
+      ingress.className: "nginx"
+      ingress.hosts:
+        - "secure.eoapi.dev"
+        - "backup.eoapi.dev"
+      ingress.tls.enabled: true
+      ingress.tls.secretName: "eoapi-tls"
+      raster.enabled: true
+      stac.enabled: false
+      vector.enabled: false
+      multidim.enabled: false
+      browser.enabled: false
+    asserts:
+      - isKind:
+          of: Ingress
+      - equal:
+          path: spec.tls[0].hosts[0]
+          value: "secure.eoapi.dev"
+      - equal:
+          path: spec.tls[0].hosts[1]
+          value: "backup.eoapi.dev"
+      - equal:
+          path: spec.tls[0].secretName
+          value: "eoapi-tls"
+
+  - it: "single host with tls"
+    template: templates/networking/ingress.yaml
+    set:
+      ingress.className: "nginx"
+      ingress.host: "api.eoapi.dev"
+      ingress.tls.enabled: true
+      ingress.tls.secretName: "eoapi-tls"
+      raster.enabled: true
+      stac.enabled: false
+      vector.enabled: false
+      multidim.enabled: false
+      browser.enabled: false
+    asserts:
+      - isKind:
+          of: Ingress
+      - equal:
+          path: spec.rules[0].host
+          value: "api.eoapi.dev"
+      - equal:
+          path: spec.tls[0].hosts[0]
+          value: "api.eoapi.dev"
+      - equal:
+          path: spec.tls[0].secretName
+          value: "eoapi-tls"
+
+  - it: "stac with auth proxy enabled"
+    template: templates/networking/ingress.yaml
+    set:
+      ingress.enabled: true
+      ingress.className: "nginx"
+      raster.enabled: false
+      stac.enabled: true
+      stac.ingress.enabled: true
+      stac.ingress.path: "/stac"
+      stac-auth-proxy.enabled: true
+      vector.enabled: false
+      multidim.enabled: false
+      browser.enabled: false
+    asserts:
+      - isKind:
+          of: Ingress
+      - equal:
+          path: spec.rules[0].http.paths[0].backend.service.name
+          value: RELEASE-NAME-stac-auth-proxy
+
+  - it: "browser with default path"
+    template: templates/networking/ingress.yaml
+    set:
+      ingress.enabled: true
+      ingress.className: "nginx"
+      raster.enabled: false
+      stac.enabled: false
+      vector.enabled: false
+      multidim.enabled: false
+      browser.enabled: true
+      browser.ingress.enabled: true
+    asserts:
+      - isKind:
+          of: Ingress
+      - equal:
+          path: spec.rules[0].http.paths[0].path
+          value: "/browser(/|$)(.*)"
+      - equal:
+          path: spec.rules[0].http.paths[0].backend.service.name
+          value: RELEASE-NAME-browser
+
+  - it: "docServer creates root path entry"
+    template: templates/networking/ingress.yaml
+    set:
+      ingress.enabled: true
+      ingress.className: "nginx"
+      raster.enabled: false
+      stac.enabled: false
+      vector.enabled: false
+      multidim.enabled: false
+      browser.enabled: false
+      docServer.enabled: true
+    asserts:
+      - isKind:
+          of: Ingress
+      - equal:
+          path: spec.rules[0].http.paths[0].path
+          value: "/"
+      - equal:
+          path: spec.rules[0].http.paths[0].backend.service.name
+          value: RELEASE-NAME-doc-server
+
+  - it: "mockOidcServer with custom path"
+    template: templates/networking/ingress.yaml
+    set:
+      ingress.enabled: true
+      ingress.className: "nginx"
+      raster.enabled: false
+      stac.enabled: false
+      vector.enabled: false
+      multidim.enabled: false
+      browser.enabled: false
+      testing.mockOidcServer.enabled: true
+      testing.mockOidcServer.service.port: 8080
+      testing.mockOidcServer.ingress.enabled: true
+      testing.mockOidcServer.ingress.path: "/auth"
+    asserts:
+      - isKind:
+          of: Ingress
+      - equal:
+          path: spec.rules[0].http.paths[0].path
+          value: "/auth(/|$)(.*)"
+      - equal:
+          path: spec.rules[0].http.paths[0].backend.service.name
+          value: RELEASE-NAME-mock-oidc-server
+
+  - it: "custom annotations preserved"
+    template: templates/networking/ingress.yaml
+    set:
+      ingress.enabled: true
+      ingress.className: "nginx"
+      ingress.annotations:
+        cert-manager.io/cluster-issuer: "letsencrypt-prod"
+        nginx.ingress.kubernetes.io/rate-limit: "100"
+      raster.enabled: true
+      stac.enabled: false
+      vector.enabled: false
+      multidim.enabled: false
+      browser.enabled: false
+    asserts:
+      - isKind:
+          of: Ingress
+      - equal:
+          path: metadata.annotations
+          value:
+            nginx.ingress.kubernetes.io/rewrite-target: /$2
+            nginx.ingress.kubernetes.io/use-regex: "true"
+            cert-manager.io/cluster-issuer: "letsencrypt-prod"
+            nginx.ingress.kubernetes.io/rate-limit: "100"
+
+  - it: "traefik entrypoints coexist with custom annotations"
+    template: templates/networking/ingress.yaml
+    set:
+      ingress.className: "traefik"
+      ingress.entrypoints: "websecure"
+      ingress.annotations:
+        cert-manager.io/cluster-issuer: "letsencrypt-prod"
+      ingress.host: "eoapi.local"
+      raster.enabled: true
+      stac.enabled: false
+      vector.enabled: false
+      multidim.enabled: false
+      browser.enabled: false
+    asserts:
+      - isKind:
+          of: Ingress
+      - equal:
+          path: metadata.annotations
+          value:
+            traefik.ingress.kubernetes.io/router.entrypoints: websecure
+            cert-manager.io/cluster-issuer: "letsencrypt-prod"
+            traefik.ingress.kubernetes.io/router.middlewares: NAMESPACE-RELEASE-NAME-strip-prefix-middleware@kubernetescrd
+
+  - it: "traefik user router.middlewares annotation overrides generated chain"
+    template: templates/networking/ingress.yaml
+    set:
+      ingress.className: "traefik"
+      ingress.annotations:
+        traefik.ingress.kubernetes.io/router.middlewares: custom-auth@kubernetescrd
+      ingress.host: "eoapi.local"
+      raster.enabled: true
+      stac.enabled: false
+      vector.enabled: false
+      multidim.enabled: false
+      browser.enabled: false
+    asserts:
+      - equal:
+          path: metadata.annotations["traefik.ingress.kubernetes.io/router.middlewares"]
+          value: custom-auth@kubernetescrd
+
+  - it: "nginx chart rewrite annotations win over user rewrite-target/use-regex"
+    template: templates/networking/ingress.yaml
+    set:
+      ingress.className: "nginx"
+      ingress.annotations:
+        nginx.ingress.kubernetes.io/rewrite-target: /custom
+        nginx.ingress.kubernetes.io/use-regex: "false"
+      ingress.host: "eoapi.local"
+      raster.enabled: true
+      stac.enabled: false
+      vector.enabled: false
+      multidim.enabled: false
+      browser.enabled: false
+    asserts:
+      - equal:
+          path: metadata.annotations["nginx.ingress.kubernetes.io/rewrite-target"]
+          value: /$2
+      - equal:
+          path: metadata.annotations["nginx.ingress.kubernetes.io/use-regex"]
+          value: "true"
+
+  - it: "docServer honors ingress.rootPath"
+    template: templates/networking/ingress.yaml
+    set:
+      ingress.enabled: true
+      ingress.className: "nginx"
+      ingress.rootPath: "docs"
+      raster.enabled: false
+      stac.enabled: false
+      vector.enabled: false
+      multidim.enabled: false
+      browser.enabled: false
+      docServer.enabled: true
+    asserts:
+      - equal:
+          path: spec.rules[0].http.paths[0].path
+          value: "/docs"
+      - equal:
+          path: spec.rules[0].http.paths[0].backend.service.name
+          value: RELEASE-NAME-doc-server
+
+  - it: "should not create ingress when ingress is disabled"
+    template: templates/networking/ingress.yaml
+    set:
+      ingress.enabled: false
+      raster.enabled: true
+      stac.enabled: true
+      vector.enabled: true
+      browser.enabled: true
+    asserts:
+      - hasDocuments:
+          count: 0
+
+  - it: "should omit raster from ingress when raster ingress is disabled"
+    template: templates/networking/ingress.yaml
+    set:
+      ingress.enabled: true
+      ingress.className: "nginx"
+      raster.enabled: true
+      raster.ingress.enabled: false
+      stac.enabled: true
+      vector.enabled: false
+      multidim.enabled: false
+      browser.enabled: false
+    asserts:
+      - isKind:
+          of: Ingress
+      - equal:
+          path: spec.rules[0].http.paths[0].path
+          value: "/stac(/|$)(.*)"
+      - notContains:
+          path: spec.rules[0].http.paths
+          content:
+            path: "/raster(/|$)(.*)"
+
+  - it: "multidim ingress with traefik controller"
+    template: templates/networking/ingress.yaml
+    set:
+      ingress.className: "traefik"
+      ingress.host: "eoapi.local"
+      raster.enabled: false
+      stac.enabled: false
+      vector.enabled: false
+      multidim.enabled: true
+      browser.enabled: false
+    asserts:
+      - isKind:
+          of: Ingress
+      - equal:
+          path: spec.rules[0].http.paths[0].path
+          value: "/multidim"
+      - equal:
+          path: spec.rules[0].http.paths[0].backend.service.name
+          value: RELEASE-NAME-multidim
+      - equal:
+          path: metadata.annotations["traefik.ingress.kubernetes.io/router.middlewares"]
+          value: "NAMESPACE-RELEASE-NAME-strip-prefix-middleware@kubernetescrd"

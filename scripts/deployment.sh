@@ -1,0 +1,398 @@
+#!/usr/bin/env bash
+
+# eoAPI Scripts - Deployment Management
+# Deploy and debug eoAPI instances on Kubernetes
+
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+
+source "${SCRIPT_DIR}/lib/common.sh"
+source "${SCRIPT_DIR}/lib/k8s.sh"
+
+# Defaults
+RELEASE_NAME="${RELEASE_NAME:-eoapi}"
+NAMESPACE="${NAMESPACE:-eoapi}"
+readonly PGO_VERSION="${PGO_VERSION:-5.8.6}"
+TIMEOUT="${TIMEOUT:-6m}"
+LOCAL_PROFILE="${LOCAL_PROFILE:-}"
+# Global array for custom values files
+declare -a VALUES_FILES=()
+
+resolve_local_profile_file() {
+    local profile="$1"
+
+    case "$profile" in
+        k3d|k3s)
+            echo "charts/eoapi/profiles/local/k3s.yaml"
+            ;;
+        minikube)
+            echo "charts/eoapi/profiles/local/minikube.yaml"
+            ;;
+        *)
+            log_error "Unknown local profile: $profile (expected k3d or minikube)"
+            return 1
+            ;;
+    esac
+}
+
+values_include_local_profile() {
+    local values_file
+    for values_file in "${VALUES_FILES[@]}"; do
+        if [[ "$values_file" == *profiles/local/* ]]; then
+            return 0
+        fi
+    done
+    return 1
+}
+
+show_help() {
+    cat <<EOF
+Deployment Management for eoAPI
+
+USAGE:
+    $(basename "$0") [OPTIONS] <COMMAND> [ARGS]
+
+COMMANDS:
+    run             Deploy eoAPI with Helm
+    debug           Show deployment diagnostics
+
+OPTIONS:
+    -h, --help      Show this help message
+    -d, --debug     Enable debug mode
+    -n, --namespace Set Kubernetes namespace
+    -f, --values    Additional Helm values file(s) (can be specified multiple times)
+    --profile TYPE  Local cluster profile: k3d (Traefik) or minikube (NGINX)
+    --release NAME  Helm release name (default: ${RELEASE_NAME})
+    --timeout TIME  Deployment timeout (default: ${TIMEOUT})
+
+EXAMPLES:
+    # Deploy eoAPI on k3d
+    $(basename "$0") run --profile k3d
+
+    # Deploy eoAPI on minikube
+    $(basename "$0") run --profile minikube
+
+    # Deploy with custom values
+    $(basename "$0") run --profile k3d -f examples/browser-customization.yaml
+
+    # Debug deployment
+    $(basename "$0") debug
+EOF
+}
+
+run_deployment() {
+    local deploy_timeout="${1:-$TIMEOUT}"
+
+    if [[ -n "$LOCAL_PROFILE" ]]; then
+        resolve_local_profile_file "$LOCAL_PROFILE" >/dev/null || return 1
+        if values_include_local_profile; then
+            log_error "Cannot combine --profile with -f profiles/local/*"
+            return 1
+        fi
+    fi
+
+    log_info "Deploying eoAPI (release: ${RELEASE_NAME}, namespace: ${NAMESPACE})"
+
+    check_requirements kubectl helm || return 1
+    validate_cluster || return 1
+
+    create_namespace "$NAMESPACE"
+
+    log_info "Installing PostgreSQL Operator v${PGO_VERSION}..."
+    if helm list -q | grep -q "^pgo$"; then
+        helm upgrade pgo oci://registry.developers.crunchydata.com/crunchydata/pgo \
+            --version "$PGO_VERSION" --set disable_check_for_upgrades=true
+    else
+        helm install pgo oci://registry.developers.crunchydata.com/crunchydata/pgo \
+            --version "$PGO_VERSION" --set disable_check_for_upgrades=true
+    fi
+
+    log_info "Waiting for PGO to be ready..."
+    kubectl wait --for=condition=Available deployment/pgo --timeout=300s
+
+    cd "$PROJECT_ROOT"
+    log_info "Building Helm dependencies from Chart.lock..."
+    if ! ensure_chart_dependencies charts/eoapi; then
+        log_error "Failed to build Helm chart dependencies"
+        return 1
+    fi
+
+    local helm_cmd="helm upgrade --install $RELEASE_NAME charts/eoapi -n $NAMESPACE --create-namespace"
+    local testing_mode=false
+
+    if [[ -f "charts/eoapi/profiles/experimental.yaml" ]]; then
+        log_info "Applying experimental profile..."
+        helm_cmd="$helm_cmd -f charts/eoapi/profiles/experimental.yaml"
+        testing_mode=true
+    fi
+
+    # Apply explicit local profile when requested
+    if [[ -n "$LOCAL_PROFILE" ]]; then
+        local profile_file
+        profile_file=$(resolve_local_profile_file "$LOCAL_PROFILE") || return 1
+        if [[ -f "$profile_file" ]]; then
+            log_info "Applying local profile: $LOCAL_PROFILE ($profile_file)"
+            helm_cmd="$helm_cmd -f $profile_file"
+        else
+            log_error "Local profile file not found: $profile_file"
+            return 1
+        fi
+    fi
+
+    # Add custom values files
+    if [[ ${#VALUES_FILES[@]} -gt 0 ]]; then
+        for values_file in "${VALUES_FILES[@]}"; do
+            if [[ -f "$values_file" ]]; then
+                log_info "Applying custom values from: $values_file"
+                helm_cmd="$helm_cmd -f $values_file"
+            else
+                log_error "Values file not found: $values_file"
+                return 1
+            fi
+        done
+    fi
+
+    helm_cmd="$helm_cmd --set eoapi-notifier.config.sources[0].type=pgstac"
+    helm_cmd="$helm_cmd --set eoapi-notifier.config.sources[0].config.connection.existingSecret.name=$RELEASE_NAME-pguser-eoapi"
+
+    # Set UPSTREAM_URL and OIDC_DISCOVERY_URL dynamically for stac-auth-proxy when testing mode is enabled
+    # Testing mode enables stac-auth-proxy, so we need to set the correct service names
+    # Also configure STAC service to run without root path when behind auth proxy
+    if [[ "$testing_mode" == "true" ]]; then
+        # Create temporary values file for dynamic stac-auth-proxy configuration
+        local temp_values="/tmp/stac-auth-proxy-values-${RELEASE_NAME}.yaml"
+        cat > "$temp_values" <<EOF
+stac-auth-proxy:
+  env:
+    UPSTREAM_URL: "http://${RELEASE_NAME}-stac:8080"
+    OIDC_DISCOVERY_URL: "http://${RELEASE_NAME}-mock-oidc-server.${NAMESPACE}.svc.cluster.local:8080/.well-known/openid-configuration"
+    # Subchart default points at localhost:8081 (oauth2-proxy sidecar); override for mock OIDC service.
+    OIDC_DISCOVERY_INTERNAL_URL: "http://${RELEASE_NAME}-mock-oidc-server.${NAMESPACE}.svc.cluster.local:8080/.well-known/openid-configuration"
+  initContainers:
+    - name: wait-for-mock-oidc
+      image: busybox:1.35
+      command: ['sh', '-c', 'until nc -z ${RELEASE_NAME}-mock-oidc-server.${NAMESPACE}.svc.cluster.local 8080; do echo waiting for mock-oidc; sleep 2; done']
+    - name: wait-for-stac
+      image: busybox:1.35
+      command: ['sh', '-c', 'until nc -z ${RELEASE_NAME}-stac.${NAMESPACE}.svc.cluster.local 8080; do echo waiting for stac service; sleep 2; done']
+EOF
+        helm_cmd="$helm_cmd -f $temp_values"
+        # Configure STAC service to run without root path when behind auth proxy
+        # Empty string makes STAC service run at root path (no --root-path argument)
+        helm_cmd="$helm_cmd --set 'stac.overrideRootPath='"
+    fi
+
+    if is_ci; then
+        log_info "Applying CI-specific configurations..."
+        helm_cmd="$helm_cmd --set prometheus-adapter.prometheus.url=http://$RELEASE_NAME-prometheus-server.$NAMESPACE.svc.cluster.local"
+        testing_mode=true
+    fi
+
+    helm_cmd="$helm_cmd --timeout $deploy_timeout"
+
+    log_info "Deploying eoAPI..."
+    local deploy_result=0
+    if eval "$helm_cmd"; then
+        log_success "eoAPI deployed successfully"
+
+        if kubectl get job -n "$NAMESPACE" -l "app=$RELEASE_NAME-pgstac-migrate" >/dev/null 2>&1; then
+            log_info "Waiting for pgstac-migrate job to complete..."
+            if ! kubectl wait --for=condition=complete job -l "app=$RELEASE_NAME-pgstac-migrate" -n "$NAMESPACE" --timeout=600s; then
+                log_error "pgstac-migrate job failed to complete"
+                kubectl describe job -l "app=$RELEASE_NAME-pgstac-migrate" -n "$NAMESPACE"
+                kubectl logs -l "app=$RELEASE_NAME-pgstac-migrate" -n "$NAMESPACE" --tail=50 || true
+                return 1
+            fi
+        fi
+
+        if kubectl get job -n "$NAMESPACE" -l "app=$RELEASE_NAME-pgstac-load-samples" >/dev/null 2>&1; then
+            log_info "Waiting for pgstac-load-samples job to complete..."
+            if ! kubectl wait --for=condition=complete job -l "app=$RELEASE_NAME-pgstac-load-samples" -n "$NAMESPACE" --timeout=600s; then
+                log_error "pgstac-load-samples job failed to complete"
+                kubectl describe job -l "app=$RELEASE_NAME-pgstac-load-samples" -n "$NAMESPACE"
+                kubectl logs -l "app=$RELEASE_NAME-pgstac-load-samples" -n "$NAMESPACE" --tail=50 || true
+                return 1
+            fi
+        fi
+
+        log_info "Waiting for deployments to be ready..."
+        kubectl wait --for=condition=Available deployment --all -n "$NAMESPACE" --timeout="$deploy_timeout" || {
+            log_warn "Some deployments may not be ready yet"
+        }
+
+        echo ""
+        kubectl get pods -n "$NAMESPACE" -l "app.kubernetes.io/instance=$RELEASE_NAME"
+        echo ""
+
+        log_info "Available services:"
+        kubectl get svc -n "$NAMESPACE" -l "app.kubernetes.io/instance=$RELEASE_NAME"
+
+        # Wait for monitoring stack if deployed
+        if kubectl get deployment -l app.kubernetes.io/name=prometheus -n "$NAMESPACE" &>/dev/null; then
+            log_info "Waiting for monitoring components..."
+            kubectl wait --for=condition=Ready pod -l app.kubernetes.io/component=server,app.kubernetes.io/name=prometheus -n "$NAMESPACE" --timeout=120s &
+            kubectl wait --for=condition=Ready pod -l app.kubernetes.io/name=grafana -n "$NAMESPACE" --timeout=120s &
+            kubectl wait --for=condition=Ready pod -l app.kubernetes.io/name=prometheus-adapter -n "$NAMESPACE" --timeout=120s &
+            wait # Wait for all background jobs
+            log_success "Monitoring stack ready"
+            kubectl get hpa -n "$NAMESPACE" 2>/dev/null || true
+        fi
+
+        # Wait for chart metrics-server (enabled on minikube profile)
+        if kubectl get deployment -l app.kubernetes.io/name=metrics-server -n "$NAMESPACE" &>/dev/null; then
+            log_info "Waiting for metrics-server..."
+            kubectl wait --for=condition=Available deployment -l app.kubernetes.io/name=metrics-server -n "$NAMESPACE" --timeout=180s || {
+                log_warn "metrics-server deployment may not be ready yet"
+            }
+            wait_for_metrics_api 120 || true
+        fi
+    else
+        log_error "Deployment failed"
+        deploy_result=1
+    fi
+
+    # Cleanup temporary files
+    if [[ "$testing_mode" == "true" ]] && [[ -f "/tmp/stac-auth-proxy-values-${RELEASE_NAME}.yaml" ]]; then
+        rm -f "/tmp/stac-auth-proxy-values-${RELEASE_NAME}.yaml"
+    fi
+
+    return $deploy_result
+}
+
+debug_deployment() {
+    log_info "Debugging eoAPI deployment (namespace: ${NAMESPACE})"
+
+    check_requirements kubectl helm || return 1
+
+    echo ""
+    echo "═══ Helm Releases ═══"
+    helm list -n "$NAMESPACE"
+
+    echo ""
+    echo "═══ Pod Status ═══"
+    kubectl get pods -n "$NAMESPACE" -o wide
+
+    echo ""
+    echo "═══ Pod Descriptions ═══"
+    for pod in $(kubectl get pods -n "$NAMESPACE" -o name); do
+        echo "── ${pod#pod/} ──"
+        kubectl describe "$pod" -n "$NAMESPACE" | grep -E "^(Status:|Ready:|Restart Count:|Events:)" -A 5
+        echo ""
+    done
+
+    echo "═══ Services ═══"
+    kubectl get svc -n "$NAMESPACE"
+
+    echo ""
+    echo "═══ Ingress ═══"
+    kubectl get ingress -n "$NAMESPACE" 2>/dev/null || echo "No ingress found"
+
+    echo ""
+    echo "═══ Recent Events ═══"
+    kubectl get events -n "$NAMESPACE" --sort-by='.lastTimestamp' | tail -20
+
+    echo ""
+    echo "═══ Recent Logs (last 50 lines per pod) ═══"
+    for pod in $(kubectl get pods -n "$NAMESPACE" -o jsonpath='{.items[*].metadata.name}'); do
+        echo "── $pod ──"
+        kubectl logs -n "$NAMESPACE" "$pod" --tail=50 2>/dev/null || echo "No logs available"
+        echo ""
+    done
+
+    echo "═══ Health Check ═══"
+    local issues=0
+
+    pending=$(kubectl get pods -n "$NAMESPACE" --field-selector=status.phase=Pending --no-headers 2>/dev/null | wc -l)
+    if [[ $pending -gt 0 ]]; then
+        log_warn "Found $pending pending pods"
+        ((issues++))
+    fi
+
+    crashloop=$(kubectl get pods -n "$NAMESPACE" -o json | jq -r '.items[] | select(.status.containerStatuses[]?.state.waiting.reason == "CrashLoopBackOff") | .metadata.name' 2>/dev/null | wc -l)
+    if [[ $crashloop -gt 0 ]]; then
+        log_warn "Found $crashloop pods in CrashLoopBackOff"
+        ((issues++))
+    fi
+
+    if [[ $issues -eq 0 ]]; then
+        log_success "No obvious issues detected"
+    else
+        log_warn "Found $issues potential issues"
+    fi
+}
+
+main() {
+    local timeout="$TIMEOUT"
+    local release_name="$RELEASE_NAME"
+    local command=""
+
+    # Parse options
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            -h|--help)
+                show_help
+                exit 0
+                ;;
+            -d|--debug)
+                export DEBUG_MODE=true
+                shift
+                ;;
+            -n|--namespace)
+                NAMESPACE="$2"
+                shift 2
+                ;;
+            -f|--values)
+                VALUES_FILES+=("$2")
+                shift 2
+                ;;
+            --release)
+                release_name="$2"
+                RELEASE_NAME="$release_name"
+                shift 2
+                ;;
+            --timeout)
+                timeout="$2"
+                TIMEOUT="$timeout"
+                shift 2
+                ;;
+            --profile)
+                LOCAL_PROFILE="$2"
+                shift 2
+                ;;
+            run|debug)
+                command="$1"
+                shift
+                ;;
+            *)
+                log_error "Unknown option: $1"
+                show_help
+                exit 1
+                ;;
+        esac
+    done
+
+    if [[ -z "$command" ]]; then
+        log_error "No command specified"
+        show_help
+        exit 1
+    fi
+
+    case "$command" in
+        run)
+            run_deployment "$timeout"
+            ;;
+        debug)
+            debug_deployment
+            ;;
+        *)
+            log_error "Unknown command: $command"
+            exit 1
+            ;;
+    esac
+}
+
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+    main "$@"
+fi

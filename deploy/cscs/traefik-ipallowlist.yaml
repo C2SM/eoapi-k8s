@@ -1,0 +1,14 @@
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: eoapi-dev-ipallowlist
+  namespace: eoapi-dev
+spec:
+  ipAllowList:
+    sourceRange:
+      - 179.237.80.26/32
+      - 195.176.0.0/17
+      - 148.187.128.0/18
+      - 148.187.0.0/18
+      - 172.16.0.0/12
+      - 129.132.0.0/16

@@ -1,0 +1,71 @@
+suite: stac browser custom config tests
+templates:
+  - templates/services/browser/deployment.yaml
+  - templates/services/browser/configmap.yaml
+  - templates/_helpers/core.tpl
+  - templates/_helpers/networking.tpl
+  - templates/_helpers/services.tpl
+tests:
+  - it: "stac browser custom config configmap"
+    set:
+      raster.enabled: false
+      stac.enabled: false
+      vector.enabled: false
+      multidim.enabled: false
+      browser.enabled: true
+      browser.customConfig: |
+        window.STAC_BROWSER_CONFIG.buildTileUrlTemplate = function(asset) {
+          return null;
+        };
+      gitSha: "ABC123"
+    template: templates/services/browser/configmap.yaml
+    asserts:
+      - isKind:
+          of: ConfigMap
+      - equal:
+          path: metadata.name
+          value: RELEASE-NAME-browser-config
+      - matchRegex:
+          path: data["browser_config.js"]
+          pattern: "window.STAC_BROWSER_CONFIG.buildTileUrlTemplate = function"
+      - matchRegex:
+          path: data["50-browser-custom-config.sh"]
+          pattern: "cat /etc/eoapi/browser/browser_config.js >> /usr/share/nginx/html/runtime-config.js"
+
+  - it: "stac browser deployment with custom config mounted"
+    set:
+      raster.enabled: false
+      stac.enabled: false
+      vector.enabled: false
+      multidim.enabled: false
+      browser.enabled: true
+      browser.customConfig: |
+        window.STAC_BROWSER_CONFIG.buildTileUrlTemplate = function(asset) {
+          return null;
+        };
+      gitSha: "ABC123"
+    template: templates/services/browser/deployment.yaml
+    asserts:
+      - exists:
+          path: spec.template.metadata.annotations["checksum/browser-config"]
+      - contains:
+          path: spec.template.spec.containers[0].volumeMounts
+          content:
+            name: browser-custom-config
+            mountPath: /etc/eoapi/browser/browser_config.js
+            subPath: browser_config.js
+            readOnly: true
+      - contains:
+          path: spec.template.spec.containers[0].volumeMounts
+          content:
+            name: browser-custom-config
+            mountPath: /docker-entrypoint.d/50-browser-custom-config.sh
+            subPath: 50-browser-custom-config.sh
+            readOnly: true
+      - contains:
+          path: spec.template.spec.volumes
+          content:
+            name: browser-custom-config
+            configMap:
+              name: RELEASE-NAME-browser-config
+              defaultMode: 365

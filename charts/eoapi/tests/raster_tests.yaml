@@ -1,0 +1,84 @@
+suite: raster service tests
+templates:
+  - templates/_helpers/core.tpl
+  - templates/_helpers/database.tpl
+  - templates/_helpers/services.tpl
+  - templates/services/raster/deployment.yaml
+  - templates/services/raster/configmap.yaml
+  - templates/services/raster/service.yaml
+  - templates/services/raster/hpa.yaml
+tests:
+  - it: "raster deployment defaults"
+    set:
+      raster.enabled: true
+      stac.enabled: false
+      vector.enabled: false
+      multidim.enabled: false
+    template: templates/services/raster/deployment.yaml
+    asserts:
+      - isKind:
+          of: Deployment
+      - matchRegex:
+          path: metadata.name
+          pattern: ^RELEASE-NAME-raster$
+      - equal:
+          path: spec.strategy.type
+          value: "RollingUpdate"
+
+  - it: "raster deployment includes configmap checksum annotation"
+    set:
+      raster.enabled: true
+      stac.enabled: false
+      vector.enabled: false
+      multidim.enabled: false
+    template: templates/services/raster/deployment.yaml
+    asserts:
+      - exists:
+          path: spec.template.metadata.annotations["checksum/config"]
+      - matchRegex:
+          path: spec.template.metadata.annotations["checksum/config"]
+          pattern: ^[a-f0-9]{64}$
+
+  - it: "raster configmap defaults"
+    set:
+      raster.enabled: true
+      stac.enabled: false
+      vector.enabled: false
+      multidim.enabled: false
+    template: templates/services/raster/configmap.yaml
+    asserts:
+      - isKind:
+          of: ConfigMap
+      - matchRegex:
+          path: metadata.name
+          pattern: ^RELEASE-NAME-raster-envvar-configmap$
+      - equal:
+          path: data.GDAL_HTTP_MULTIPLEX
+          value: "YES"
+
+  - it: "raster browser service"
+    set:
+      raster.enabled: true
+      stac.enabled: false
+      vector.enabled: false
+      multidim.enabled: false
+      browser.enabled: false
+      raster.annotations:
+        annotation1: hello
+        annotation2: world
+    template: templates/services/raster/service.yaml
+    asserts:
+      - isKind:
+          of: Service
+      - matchRegex:
+          path: metadata.name
+          pattern: ^RELEASE-NAME-raster$
+      - matchRegex:
+          path: metadata.labels.app
+          pattern: ^RELEASE-NAME-raster$
+      - equal:
+          path: metadata.annotations.annotation1
+          value: hello
+      - equal:
+          path: metadata.annotations.annotation2
+          value: world

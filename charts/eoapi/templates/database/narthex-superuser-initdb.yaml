@@ -1,0 +1,64 @@
+{{- if and (index .Values "postgrescluster-narthex" "enabled") (index .Values "narthex-backend" "enabled") }}
+{{- $pgName := (index .Values "postgrescluster-narthex" "name") | default "narthex" }}
+# PG15+ no longer grants CREATE on the public schema to the database owner
+# by default (https://www.postgresql.org/docs/15/release-15.html), so the
+# narthex user's own `alembic upgrade head` (run on narthex-backend
+# startup) fails with "permission denied for schema public" until this
+# reassigns ownership. Same reasoning/pattern as pgstacbootstrap's
+# eoap-superuser-initdb.yaml job, just schema- instead of database-level -
+# narthex's migrations don't need pgstac's extensions/roles.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ .Release.Name }}-narthex-superuser-init-db
+  labels:
+    app: {{ .Release.Name }}-narthex-superuser-init-db
+  annotations:
+    "helm.sh/hook": post-install,post-upgrade
+    "helm.sh/hook-weight": "-5"
+    "helm.sh/hook-delete-policy": before-hook-creation
+spec:
+  template:
+    metadata:
+      labels:
+        app: {{ .Release.Name }}-narthex-superuser-init-db
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: narthex-superuser-init-db
+          image: postgres:16-alpine
+          command:
+            - /bin/sh
+            - -c
+          args:
+            - |
+              set -e
+              psql -c "ALTER SCHEMA public OWNER TO narthex;"
+          env:
+            - name: PGUSER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $pgName }}-pguser-postgres
+                  key: user
+            - name: PGPASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $pgName }}-pguser-postgres
+                  key: password
+            - name: PGHOST
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $pgName }}-pguser-postgres
+                  key: host
+            - name: PGPORT
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $pgName }}-pguser-postgres
+                  key: port
+            - name: PGDATABASE
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $pgName }}-pguser-postgres
+                  key: dbname
+  backoffLimit: 5
+{{- end }}

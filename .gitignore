@@ -1,0 +1,18 @@
+.idea/
+.vscode/
+.pytest_cache
+.venv
+charts/config.yaml
+charts/eoapi/charts/*.tgz
+config_ingress.yaml
+dist
+site
+__pycache__
+
+mock-oidc-server
+tmpcharts*
+
+# Local secrets / kubeconfigs - never commit these
+*.env
+c2sm-tds.yaml
+cookies.txt

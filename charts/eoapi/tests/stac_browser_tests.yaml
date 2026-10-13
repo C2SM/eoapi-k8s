@@ -1,0 +1,372 @@
+suite: stac browser service tests
+templates:
+  - templates/_helpers/core.tpl
+  - templates/_helpers/networking.tpl
+  - templates/_helpers/services.tpl
+  - templates/services/browser/deployment.yaml
+  - templates/services/browser/service.yaml
+tests:
+  - it: "stac browser deployment"
+    set:
+      raster.enabled: false
+      stac.enabled: false
+      vector.enabled: false
+      multidim.enabled: false
+      browser.enabled: true
+    template: templates/services/browser/deployment.yaml
+    asserts:
+      - isKind:
+          of: Deployment
+      - matchRegex:
+          path: metadata.name
+          pattern: ^RELEASE-NAME-browser$
+      - matchRegex:
+          path: metadata.labels.app
+          pattern: ^RELEASE-NAME-browser$
+  - it: "stac browser service"
+    set:
+      raster.enabled: false
+      stac.enabled: false
+      vector.enabled: false
+      multidim.enabled: false
+      browser.enabled: true
+      browser.annotations:
+        annotation1: hello
+        annotation2: world
+    template: templates/services/browser/service.yaml
+    asserts:
+      - isKind:
+          of: Service
+      - matchRegex:
+          path: metadata.name
+          pattern: ^RELEASE-NAME-browser$
+      - matchRegex:
+          path: metadata.labels.app
+          pattern: ^RELEASE-NAME-browser$
+      - equal:
+          path: metadata.annotations.annotation1
+          value: hello
+      - equal:
+          path: metadata.annotations.annotation2
+          value: world
+  - it: "stac browser deployment with auth enabled"
+    set:
+      raster.enabled: false
+      stac.enabled: true
+      vector.enabled: false
+      multidim.enabled: false
+      browser.enabled: true
+      stac-auth-proxy.enabled: true
+      stac-auth-proxy.env.OIDC_DISCOVERY_URL: "http://localhost/mock-oidc/.well-known/openid-configuration"
+      ingress.host: "localhost"
+      stac.ingress.path: "/stac"
+      testing.mockOidcServer.ingress.path: "/mock-oidc"
+      browser.oidcClientId: "test-client"
+      browser.oidcDiscoveryUrl: "http://localhost/mock-oidc/.well-known/openid-configuration"
+    template: templates/services/browser/deployment.yaml
+    asserts:
+      - isKind:
+          of: Deployment
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: SB_catalogUrl
+            value: "http://localhost/stac"
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: SB_authConfig
+            value: |-
+              {
+                "type": "openIdConnect",
+                "openIdConnectUrl": "http://localhost/mock-oidc/.well-known/openid-configuration",
+                "oidcConfig": {
+                  "client_id": "test-client",
+                  "redirect_uri": "http://localhost/browser/auth",
+                  "scope": "openid"
+                }
+              }
+  - it: "stac browser deployment with custom OIDC_DISCOVERY_URL"
+    set:
+      raster.enabled: false
+      stac.enabled: true
+      vector.enabled: false
+      multidim.enabled: false
+      browser.enabled: true
+      stac-auth-proxy.enabled: true
+      stac-auth-proxy.env.OIDC_DISCOVERY_URL: "https://auth.example.com/.well-known/openid-configuration"
+      ingress.host: "localhost"
+      stac.ingress.path: "/stac"
+      browser.oidcClientId: "test-client"
+      browser.oidcDiscoveryUrl: "https://auth.example.com/.well-known/openid-configuration"
+    template: templates/services/browser/deployment.yaml
+    asserts:
+      - isKind:
+          of: Deployment
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: SB_authConfig
+            value: |-
+              {
+                "type": "openIdConnect",
+                "openIdConnectUrl": "https://auth.example.com/.well-known/openid-configuration",
+                "oidcConfig": {
+                  "client_id": "test-client",
+                  "redirect_uri": "http://localhost/browser/auth",
+                  "scope": "openid"
+                }
+              }
+  - it: "stac browser deployment without auth"
+    set:
+      raster.enabled: false
+      stac.enabled: true
+      vector.enabled: false
+      multidim.enabled: false
+      browser.enabled: true
+      stac-auth-proxy.enabled: false
+      ingress.host: "localhost"
+      stac.ingress.path: "/stac"
+    template: templates/services/browser/deployment.yaml
+    asserts:
+      - isKind:
+          of: Deployment
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: SB_catalogUrl
+            value: "http://localhost/stac"
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: SB_authConfig
+  - it: "stac browser deployment with custom catalogUrl override"
+    set:
+      raster.enabled: false
+      stac.enabled: true
+      vector.enabled: false
+      multidim.enabled: false
+      browser.enabled: true
+      browser.catalogUrl: "https://custom.example.com/stac"
+      ingress.host: "localhost"
+      ingress.tls.enabled: false
+      stac.ingress.path: "/stac"
+    template: templates/services/browser/deployment.yaml
+    asserts:
+      - isKind:
+          of: Deployment
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: SB_catalogUrl
+            value: "https://custom.example.com/stac"
+  - it: "stac browser deployment with HTTPS and no catalogUrl override"
+    set:
+      raster.enabled: false
+      stac.enabled: true
+      vector.enabled: false
+      multidim.enabled: false
+      browser.enabled: true
+      ingress.host: "secure.example.com"
+      ingress.tls.enabled: true
+      stac.ingress.path: "/stac"
+    template: templates/services/browser/deployment.yaml
+    asserts:
+      - isKind:
+          of: Deployment
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: SB_catalogUrl
+            value: "https://secure.example.com/stac"
+  - it: "stac browser deployment with custom authConfig object"
+    set:
+      raster.enabled: false
+      stac.enabled: true
+      vector.enabled: false
+      multidim.enabled: false
+      browser.enabled: true
+      stac-auth-proxy.enabled: true
+      stac-auth-proxy.env.OIDC_DISCOVERY_URL: "https://auth.example.com/.well-known/openid-configuration"
+      ingress.host: "example.com"
+      ingress.tls.enabled: true
+      stac.ingress.path: "/stac"
+      browser.authConfig:
+        type: "openIdConnect"
+        openIdConnectUrl: "https://auth.example.com/realms/demo/.well-known/openid-configuration"
+        oidcConfig:
+          client_id: "eoapi"
+    template: templates/services/browser/deployment.yaml
+    asserts:
+      - isKind:
+          of: Deployment
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: SB_authConfig
+            value: '{"oidcConfig":{"client_id":"eoapi"},"openIdConnectUrl":"https://auth.example.com/realms/demo/.well-known/openid-configuration","type":"openIdConnect"}'
+  - it: "stac browser deployment with custom resources set"
+    set:
+      raster.enabled: false
+      stac.enabled: false
+      vector.enabled: false
+      multidim.enabled: false
+      browser.enabled: true
+      browser.settings.resources.limits.cpu: "250m"
+      browser.settings.resources.limits.memory: "200Mi"
+      browser.settings.resources.requests.cpu: "64m"
+      browser.settings.resources.requests.memory: "100Mi"
+    template: templates/services/browser/deployment.yaml
+    asserts:
+      - isKind:
+          of: Deployment
+      - equal:
+          path: spec.template.spec.containers[0].resources.limits.cpu
+          value: "250m"
+      - equal:
+          path: spec.template.spec.containers[0].resources.limits.memory
+          value: "200Mi"
+      - equal:
+          path: spec.template.spec.containers[0].resources.requests.cpu
+          value: "64m"
+      - equal:
+          path: spec.template.spec.containers[0].resources.requests.memory
+          value: "100Mi"
+  - it: "stac browser deployment with catalogTitle"
+    set:
+      raster.enabled: false
+      stac.enabled: true
+      vector.enabled: false
+      multidim.enabled: false
+      browser.enabled: true
+      browser.catalogTitle: "Example Data Catalog"
+      ingress.host: "localhost"
+      stac.ingress.path: "/stac"
+    template: templates/services/browser/deployment.yaml
+    asserts:
+      - isKind:
+          of: Deployment
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: SB_catalogTitle
+            value: "Example Data Catalog"
+  - it: "stac browser deployment with catalogImage"
+    set:
+      raster.enabled: false
+      stac.enabled: true
+      vector.enabled: false
+      multidim.enabled: false
+      browser.enabled: true
+      browser.catalogImage: "https://example.com/images/catalog_logo.png"
+      ingress.host: "localhost"
+      stac.ingress.path: "/stac"
+    template: templates/services/browser/deployment.yaml
+    asserts:
+      - isKind:
+          of: Deployment
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: SB_catalogImage
+            value: "https://example.com/images/catalog_logo.png"
+  - it: "stac browser deployment with footerLinks"
+    set:
+      raster.enabled: false
+      stac.enabled: true
+      vector.enabled: false
+      multidim.enabled: false
+      browser.enabled: true
+      browser.footerLinks:
+        - label: "Project Home"
+          url: "https://example.com/"
+        - label: "Documentation"
+          url: "https://docs.example.com/"
+      ingress.host: "localhost"
+      stac.ingress.path: "/stac"
+    template: templates/services/browser/deployment.yaml
+    asserts:
+      - isKind:
+          of: Deployment
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: SB_footerLinks
+            value: '{"label":"Project Home","url":"https://example.com/"},{"label":"Documentation","url":"https://docs.example.com/"}'
+  - it: "stac browser deployment with all custom options"
+    set:
+      raster.enabled: false
+      stac.enabled: true
+      vector.enabled: false
+      multidim.enabled: false
+      browser.enabled: true
+      browser.catalogTitle: "Example Data Catalog"
+      browser.catalogImage: "https://example.com/images/catalog_logo.png"
+      browser.footerLinks:
+        - label: "Project Home"
+          url: "https://example.com/"
+        - label: "Documentation"
+          url: "https://docs.example.com/"
+      ingress.host: "localhost"
+      stac.ingress.path: "/stac"
+    template: templates/services/browser/deployment.yaml
+    asserts:
+      - isKind:
+          of: Deployment
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: SB_catalogTitle
+            value: "Example Data Catalog"
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: SB_catalogImage
+            value: "https://example.com/images/catalog_logo.png"
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: SB_footerLinks
+            value: '{"label":"Project Home","url":"https://example.com/"},{"label":"Documentation","url":"https://docs.example.com/"}'
+  - it: "stac browser deployment appends browser.extraEnv after the built-in env"
+    set:
+      raster.enabled: false
+      stac.enabled: false
+      vector.enabled: false
+      multidim.enabled: false
+      browser.enabled: true
+      browser.extraEnv:
+        - name: SB_itemsPerPage
+          value: "60"
+    template: templates/services/browser/deployment.yaml
+    asserts:
+      - isKind:
+          of: Deployment
+      # the built-in env renders first; extraEnv is appended after it (additive, not a replacement)
+      - equal:
+          path: spec.template.spec.containers[0].env[0].name
+          value: SB_pathPrefix
+      - equal:
+          path: spec.template.spec.containers[0].env[1].name
+          value: SB_catalogUrl
+      - equal:
+          path: spec.template.spec.containers[0].env[2].name
+          value: SB_itemsPerPage
+      - equal:
+          path: spec.template.spec.containers[0].env[2].value
+          value: "60"
+  - it: "stac browser deployment renders no extra env when browser.extraEnv is unset"
+    set:
+      raster.enabled: false
+      stac.enabled: false
+      vector.enabled: false
+      multidim.enabled: false
+      browser.enabled: true
+    template: templates/services/browser/deployment.yaml
+    asserts:
+      - isKind:
+          of: Deployment
+      # default extraEnv ([]) adds nothing — only the built-in SB_pathPrefix and SB_catalogUrl remain
+      - lengthEqual:
+          path: spec.template.spec.containers[0].env
+          count: 2
