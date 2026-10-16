@@ -129,3 +129,60 @@ tests:
       - equal:
           path: metadata.annotations.annotation2
           value: world
+
+  - it: "stac connects as the pguser Secret's user by default"
+    set:
+      stac.enabled: true
+    template: templates/services/stac/deployment.yaml
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: PGUSER
+            valueFrom:
+              secretKeyRef:
+                name: RELEASE-NAME-pguser-eoapi
+                key: user
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: DATABASE_URL
+            valueFrom:
+              secretKeyRef:
+                name: RELEASE-NAME-pguser-eoapi
+                key: uri
+
+  - it: "stac connects as settings.dbUser with the Secret's password"
+    set:
+      stac.enabled: true
+      stac.settings.dbUser: eoapi-stac
+    template: templates/services/stac/deployment.yaml
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: PGUSER
+            value: eoapi-stac
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: POSTGRES_USER
+            value: eoapi-stac
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: PGPASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: RELEASE-NAME-pguser-eoapi
+                key: password
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          any: true
+          content:
+            name: DATABASE_URL
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          any: true
+          content:
+            name: PGBOUNCER_URI

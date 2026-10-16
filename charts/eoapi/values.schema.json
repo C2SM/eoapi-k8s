@@ -349,6 +349,41 @@
               "type": "string",
               "description": "Database name"
             },
+            "userConnectionLimit": {
+              "type": "integer",
+              "minimum": -1,
+              "not": { "const": 0 },
+              "description": "CONNECTION LIMIT applied to settings.user by the superuser init job; -1 lifts it"
+            },
+            "extraUsers": {
+              "type": "array",
+              "description": "Connection-limited login roles sharing the password of settings.user, created by the superuser init job",
+              "items": {
+                "type": "object",
+                "required": ["name", "connectionLimit"],
+                "additionalProperties": false,
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "pattern": "^[a-z_][a-z0-9_-]{0,62}$",
+                    "description": "Role name"
+                  },
+                  "connectionLimit": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "description": "Maximum concurrent connections for the role"
+                  },
+                  "memberOf": {
+                    "type": "array",
+                    "description": "pgSTAC roles granted to the role",
+                    "items": {
+                      "type": "string",
+                      "enum": ["pgstac_read", "pgstac_ingest", "pgstac_admin"]
+                    }
+                  }
+                }
+              }
+            },
             "resources": {
               "type": "object",
               "description": "Resource requirements"
@@ -1272,6 +1307,10 @@
             "extraVolumes": {
               "type": "array",
               "description": "Additional volumes"
+            },
+            "dbUser": {
+              "type": "string",
+              "description": "Database role to connect as instead of the pguser Secret's user (postgrescluster only); must share its password, e.g. one of pgstacBootstrap.settings.extraUsers"
             },
             "envVars": {
               "type": "object",

@@ -94,7 +94,7 @@ spec:
         resources:
           {{- toYaml .Values.stac.settings.resources | nindent 10 }}
         env:
-          {{- include "eoapi.postgresqlEnv" . | nindent 10 }}
+          {{- include "eoapi.postgresqlEnv" (dict "root" . "service" "stac") | nindent 10 }}
           {{- include "eoapi.commonEnvVars" (dict "service" "stac" "root" .) | nindent 10 }}
         envFrom:
           - configMapRef:

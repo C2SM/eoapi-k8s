@@ -90,7 +90,7 @@ spec:
         resources:
           {{- toYaml .Values.raster.settings.resources | nindent 10 }}
         env:
-          {{- include "eoapi.postgresqlEnv" . | nindent 10 }}
+          {{- include "eoapi.postgresqlEnv" (dict "root" . "service" "raster") | nindent 10 }}
           {{- include "eoapi.commonEnvVars" (dict "service" "raster" "root" .) | nindent 10 }}
         envFrom:
           - configMapRef:

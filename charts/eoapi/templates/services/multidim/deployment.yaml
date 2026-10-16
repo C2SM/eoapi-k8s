@@ -90,7 +90,7 @@ spec:
         resources:
           {{- toYaml .Values.multidim.settings.resources | nindent 10 }}
         env:
-          {{- include "eoapi.postgresqlEnv" . | nindent 10 }}
+          {{- include "eoapi.postgresqlEnv" (dict "root" . "service" "multidim") | nindent 10 }}
           {{- include "eoapi.commonEnvVars" (dict "service" "multidim" "root" .) | nindent 10 }}
         envFrom:
           - configMapRef:

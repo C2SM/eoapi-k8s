@@ -95,6 +95,9 @@ data:
     ALTER DATABASE {{ .Values.pgstacBootstrap.settings.database }} OWNER TO {{ .Values.pgstacBootstrap.settings.user }};
     ALTER USER {{ .Values.pgstacBootstrap.settings.user }} SET search_path TO pgstac, public;
     ALTER ROLE {{ .Values.pgstacBootstrap.settings.user }} WITH CREATEROLE;
+    {{- with .Values.pgstacBootstrap.settings.userConnectionLimit }}
+    ALTER ROLE {{ $.Values.pgstacBootstrap.settings.user }} CONNECTION LIMIT {{ int . }};
+    {{- end }}
     ALTER DATABASE {{ .Values.pgstacBootstrap.settings.database }} set search_path to pgstac, public;
     GRANT CONNECT ON DATABASE {{ .Values.pgstacBootstrap.settings.database }} TO {{ .Values.pgstacBootstrap.settings.user }};
     GRANT ALL PRIVILEGES ON TABLES TO {{ .Values.pgstacBootstrap.settings.user }};
@@ -102,4 +105,21 @@ data:
     GRANT pgstac_read TO {{ .Values.pgstacBootstrap.settings.user }} WITH ADMIN OPTION;
     GRANT pgstac_ingest TO {{ .Values.pgstacBootstrap.settings.user }} WITH ADMIN OPTION;
     GRANT pgstac_admin TO {{ .Values.pgstacBootstrap.settings.user }} WITH ADMIN OPTION;
+    {{- range $u := .Values.pgstacBootstrap.settings.extraUsers }}
+    -- Copies the stored SCRAM verifier; an md5 hash is salted with the role name, so it can't be shared.
+    DO $$
+    DECLARE v text := (SELECT rolpassword FROM pg_authid WHERE rolname = '{{ $.Values.pgstacBootstrap.settings.user }}');
+    BEGIN
+      IF v IS NULL OR v NOT LIKE 'SCRAM-SHA-256$%' THEN
+        RAISE EXCEPTION 'cannot copy the password of {{ $.Values.pgstacBootstrap.settings.user }} to {{ $u.name }}: no SCRAM verifier';
+      END IF;
+      IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = '{{ $u.name }}') THEN
+        EXECUTE format('CREATE ROLE %I', '{{ $u.name }}');
+      END IF;
+      EXECUTE format('ALTER ROLE %I LOGIN CONNECTION LIMIT %s PASSWORD %L', '{{ $u.name }}', {{ int $u.connectionLimit }}, v);
+      {{- range $u.memberOf }}
+      EXECUTE format('GRANT %I TO %I', '{{ . }}', '{{ $u.name }}');
+      {{- end }}
+    END $$;
+    {{- end }}
 {{- end }}

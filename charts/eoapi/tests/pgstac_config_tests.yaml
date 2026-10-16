@@ -51,6 +51,89 @@ tests:
           path: data["pgstac-settings.sql"]
           pattern: "VALUES \\('update_collection_extent', 'true'\\)"
 
+  # Extra Users Tests
+  - it: should create each extra user with its limit, grants and the user's password
+    set:
+      postgrescluster:
+        enabled: true
+      pgstacBootstrap:
+        enabled: true
+        settings:
+          extraUsers:
+            - name: eoapi-ingest
+              connectionLimit: 40
+              memberOf: [pgstac_ingest]
+            - name: eoapi-stac
+              connectionLimit: 50
+              memberOf: [pgstac_read]
+    template: templates/database/pgstacbootstrap/configmap.yaml
+    documentSelector:
+      path: metadata.name
+      value: RELEASE-NAME-initdb
+    asserts:
+      - matchRegex:
+          path: data["initdb.sql"]
+          pattern: "rolpassword FROM pg_authid WHERE rolname = 'eoapi'"
+      - matchRegex:
+          path: data["initdb.sql"]
+          pattern: "LOGIN CONNECTION LIMIT %s PASSWORD %L', 'eoapi-ingest', 40, v\\)"
+      - matchRegex:
+          path: data["initdb.sql"]
+          pattern: "GRANT %I TO %I', 'pgstac_ingest', 'eoapi-ingest'"
+      - matchRegex:
+          path: data["initdb.sql"]
+          pattern: "LOGIN CONNECTION LIMIT %s PASSWORD %L', 'eoapi-stac', 50, v\\)"
+      - matchRegex:
+          path: data["initdb.sql"]
+          pattern: "GRANT %I TO %I', 'pgstac_read', 'eoapi-stac'"
+
+  - it: should cap the user's connections when userConnectionLimit is set
+    set:
+      postgrescluster:
+        enabled: true
+      pgstacBootstrap:
+        enabled: true
+        settings:
+          userConnectionLimit: 30
+    template: templates/database/pgstacbootstrap/configmap.yaml
+    documentSelector:
+      path: metadata.name
+      value: RELEASE-NAME-initdb
+    asserts:
+      - matchRegex:
+          path: data["initdb.sql"]
+          pattern: "ALTER ROLE eoapi CONNECTION LIMIT 30;"
+
+  - it: should NOT touch the user's connection limit by default
+    set:
+      postgrescluster:
+        enabled: true
+      pgstacBootstrap:
+        enabled: true
+    template: templates/database/pgstacbootstrap/configmap.yaml
+    documentSelector:
+      path: metadata.name
+      value: RELEASE-NAME-initdb
+    asserts:
+      - notMatchRegex:
+          path: data["initdb.sql"]
+          pattern: "CONNECTION LIMIT"
+
+  - it: should NOT create extra users by default
+    set:
+      postgrescluster:
+        enabled: true
+      pgstacBootstrap:
+        enabled: true
+    template: templates/database/pgstacbootstrap/configmap.yaml
+    documentSelector:
+      path: metadata.name
+      value: RELEASE-NAME-initdb
+    asserts:
+      - notMatchRegex:
+          path: data["initdb.sql"]
+          pattern: "pg_authid"
+
   # Queue Processor Tests
   - it: should create queue processor when use_queue is true
     set:

@@ -314,6 +314,20 @@ pgstacBootstrap:
     ### FOR CONFIGURING THE DB CONNECTION
     user: eoapi
     database: eoapi
+    # CONNECTION LIMIT for `user` (raster, vector, multidim, the bootstrap jobs,
+    # and stac unless stac.settings.dbUser is set). Unset leaves the role as it
+    # is; removing it later does not lift a cap already applied - set -1.
+    # userConnectionLimit: 30
+    # Extra login roles, each with its own CONNECTION LIMIT so one client (a bulk
+    # ingest, one API service) cannot take every connection the others need.
+    # The superuser init job creates them on every install/upgrade, grants
+    # memberOf and copies `user`'s password onto them, so clients use the
+    # credentials in `user`'s pguser Secret. An API service connects as one via
+    # <service>.settings.dbUser.
+    extraUsers: []
+    # - name: eoapi-ingest
+    #   connectionLimit: 40
+    #   memberOf: [pgstac_ingest]
     resources: {}
     # DEPRECATED: Use pgstacBootstrap.settings.loadSamples instead
     envVars:
@@ -502,6 +516,10 @@ stac:
     extraEnvFrom: []
     extraVolumeMounts: []
     extraVolumes: []
+    # Database role to connect as instead of the pguser Secret's user, e.g. one
+    # of pgstacBootstrap.settings.extraUsers. Also honoured by raster, vector
+    # and multidim. postgrescluster only.
+    dbUser: ""
     envVars:
       ##############
       # uvicorn

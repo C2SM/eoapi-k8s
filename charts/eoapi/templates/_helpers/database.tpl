@@ -1,101 +1,125 @@
 {{/*
-PostgreSQL environment variables based on the configured type
+PostgreSQL environment variables based on the configured type.
+Takes the root context, or (dict "root" . "service" "<service>") so that, with
+postgrescluster, the service connects as <service>.settings.dbUser when set.
 */}}
 {{- define "eoapi.postgresqlEnv" -}}
-{{- if eq .Values.postgresql.type "postgrescluster" }}
-  {{- include "eoapi.postgresclusterSecrets" . }}
-{{- else if eq .Values.postgresql.type "external-plaintext" }}
-  {{- include "eoapi.externalPlaintextPgSecrets" . }}
-{{- else if eq .Values.postgresql.type "external-secret" }}
-  {{- include "eoapi.externalSecretPgSecrets" . }}
+{{- $root := . -}}
+{{- $dbUser := "" -}}
+{{- if hasKey . "service" -}}
+  {{- $root = .root -}}
+  {{- $dbUser = (index $root.Values .service).settings.dbUser | default "" -}}
+{{- end -}}
+{{- if eq $root.Values.postgresql.type "postgrescluster" }}
+  {{- include "eoapi.postgresclusterSecrets" (dict "root" $root "dbUser" $dbUser) }}
+{{- else if eq $root.Values.postgresql.type "external-plaintext" }}
+  {{- include "eoapi.externalPlaintextPgSecrets" $root }}
+{{- else if eq $root.Values.postgresql.type "external-secret" }}
+  {{- include "eoapi.externalSecretPgSecrets" $root }}
 {{- end }}
 {{- end }}
 
 {{/*
-PostgreSQL cluster secrets
+PostgreSQL cluster secrets. A non-empty dbUser replaces the Secret's user; it
+must share that user's password (see pgstacBootstrap.settings.extraUsers).
 */}}
 {{- define "eoapi.postgresclusterSecrets" -}}
-{{- range $userName, $v := .Values.postgrescluster.users -}}
+{{- $root := .root -}}
+{{- $dbUser := .dbUser -}}
+{{- range $userName, $v := $root.Values.postgrescluster.users -}}
 {{/* do not render anything for the "postgres" user */}}
 {{- if not (eq (index $v "name") "postgres") }}
 # Standard PostgreSQL environment variables
 - name: PGUSER
+  {{- if $dbUser }}
+  value: {{ $dbUser | quote }}
+  {{- else }}
   valueFrom:
     secretKeyRef:
-      name: {{ $.Values.postgrescluster.name | default $.Release.Name }}-pguser-{{ index $v "name" }}
+      name: {{ $root.Values.postgrescluster.name | default $root.Release.Name }}-pguser-{{ index $v "name" }}
       key: user
+  {{- end }}
 - name: PGPORT
   valueFrom:
     secretKeyRef:
-      name: {{ $.Values.postgrescluster.name | default $.Release.Name }}-pguser-{{ index $v "name" }}
+      name: {{ $root.Values.postgrescluster.name | default $root.Release.Name }}-pguser-{{ index $v "name" }}
       key: port
 - name: PGHOST
   valueFrom:
     secretKeyRef:
-      name: {{ $.Values.postgrescluster.name | default $.Release.Name }}-pguser-{{ index $v "name" }}
+      name: {{ $root.Values.postgrescluster.name | default $root.Release.Name }}-pguser-{{ index $v "name" }}
       key: host
 - name: PGPASSWORD
   valueFrom:
     secretKeyRef:
-      name: {{ $.Values.postgrescluster.name | default $.Release.Name }}-pguser-{{ index $v "name" }}
+      name: {{ $root.Values.postgrescluster.name | default $root.Release.Name }}-pguser-{{ index $v "name" }}
       key: password
 - name: PGDATABASE
   valueFrom:
     secretKeyRef:
-      name: {{ $.Values.postgrescluster.name | default $.Release.Name }}-pguser-{{ index $v "name" }}
+      name: {{ $root.Values.postgrescluster.name | default $root.Release.Name }}-pguser-{{ index $v "name" }}
       key: dbname
+{{- if not $dbUser }}
+{{- /* the Secret's URIs embed its own user, so they are left out for a dbUser */}}
 - name: PGBOUNCER_URI
   valueFrom:
     secretKeyRef:
-      name: {{ $.Values.postgrescluster.name | default $.Release.Name }}-pguser-{{ index $v "name" }}
+      name: {{ $root.Values.postgrescluster.name | default $root.Release.Name }}-pguser-{{ index $v "name" }}
       key: pgbouncer-uri
+{{- end }}
 # Legacy variables for backward compatibility
 - name: POSTGRES_USER
+  {{- if $dbUser }}
+  value: {{ $dbUser | quote }}
+  {{- else }}
   valueFrom:
     secretKeyRef:
-      name: {{ $.Values.postgrescluster.name | default $.Release.Name }}-pguser-{{ index $v "name" }}
+      name: {{ $root.Values.postgrescluster.name | default $root.Release.Name }}-pguser-{{ index $v "name" }}
       key: user
+  {{- end }}
 - name: POSTGRES_PORT
   valueFrom:
     secretKeyRef:
-      name: {{ $.Values.postgrescluster.name | default $.Release.Name }}-pguser-{{ index $v "name" }}
+      name: {{ $root.Values.postgrescluster.name | default $root.Release.Name }}-pguser-{{ index $v "name" }}
       key: port
 - name: POSTGRES_HOST
   valueFrom:
     secretKeyRef:
-      name: {{ $.Values.postgrescluster.name | default $.Release.Name }}-pguser-{{ index $v "name" }}
+      name: {{ $root.Values.postgrescluster.name | default $root.Release.Name }}-pguser-{{ index $v "name" }}
       key: host
 - name: POSTGRES_HOST_READER
   valueFrom:
     secretKeyRef:
-      name: {{ $.Values.postgrescluster.name | default $.Release.Name }}-pguser-{{ index $v "name" }}
+      name: {{ $root.Values.postgrescluster.name | default $root.Release.Name }}-pguser-{{ index $v "name" }}
       key: host
 - name: POSTGRES_HOST_WRITER
   valueFrom:
     secretKeyRef:
-      name: {{ $.Values.postgrescluster.name | default $.Release.Name }}-pguser-{{ index $v "name" }}
+      name: {{ $root.Values.postgrescluster.name | default $root.Release.Name }}-pguser-{{ index $v "name" }}
       key: host
 - name: POSTGRES_PASS
   valueFrom:
     secretKeyRef:
-      name: {{ $.Values.postgrescluster.name | default $.Release.Name }}-pguser-{{ index $v "name" }}
+      name: {{ $root.Values.postgrescluster.name | default $root.Release.Name }}-pguser-{{ index $v "name" }}
       key: password
 - name: POSTGRES_DBNAME
   valueFrom:
     secretKeyRef:
-      name: {{ $.Values.postgrescluster.name | default $.Release.Name }}-pguser-{{ index $v "name" }}
+      name: {{ $root.Values.postgrescluster.name | default $root.Release.Name }}-pguser-{{ index $v "name" }}
       key: dbname
+{{- if not $dbUser }}
 - name: DATABASE_URL
   valueFrom:
     secretKeyRef:
-      name: {{ $.Values.postgrescluster.name | default $.Release.Name }}-pguser-{{ index $v "name" }}
+      name: {{ $root.Values.postgrescluster.name | default $root.Release.Name }}-pguser-{{ index $v "name" }}
       key: uri
+{{- end }}
 {{- end }}
 {{- end }}
 - name: PGADMIN_URI
   valueFrom:
     secretKeyRef:
-      name: {{ .Values.postgrescluster.name | default .Release.Name }}-pguser-postgres
+      name: {{ $root.Values.postgrescluster.name | default $root.Release.Name }}-pguser-postgres
       key: uri
 {{- end }}
 
