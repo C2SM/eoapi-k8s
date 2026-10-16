@@ -24,18 +24,24 @@ stac:
   ingress:
     enabled: true
     path: "/stac"
+  settings:
+    dbUser: eoapi-stac
 
 raster:
   enabled: true
   ingress:
     enabled: true
     path: "/raster"
+  settings:
+    dbUser: eoapi-stac
 
 vector:
   enabled: true
   ingress:
     enabled: true
     path: "/vector"
+  settings:
+    dbUser: eoapi-stac
 
 browser:
   enabled: true
@@ -341,10 +347,78 @@ postgrescluster:
         resources:
           requests:
             storage: "1Ti"
+          # Auto-grow ceiling: PGO grows the PVC by 50% at 75% full, up to
+          # this. Needs the operator's AutoGrowVolumes feature gate.
+          limits:
+            storage: "20Ti"
       resources: {}
+  # pgBackRest to CSCS object storage (tenant c2sm, user prometheus-db-backup).
+  # The keys live only in the eoapi-pgbackrest-s3 Secret (an s3.conf with
+  # repo1-s3-key / repo1-s3-key-secret), created by hand, never in values.
+  # A volume repo with no schedule or retention once filled up with archived
+  # WAL and then filled pgdata; here scheduled fulls let retention expire old
+  # WAL, and archive-push-queue-max drops WAL (breaking PITR until the next
+  # full) instead of filling pgdata when S3 is unreachable.
   backupsEnabled: true
-  backupsSize: "600Gi"
-  backupsStorageClassName: *cscsStorageClass
+  pgBackRestConfig:
+    configuration:
+      - secret:
+          name: eoapi-pgbackrest-s3
+    global:
+      repo1-path: /pgbackrest/eoapi-dev/eoapi/repo1
+      repo1-s3-uri-style: path
+      repo1-retention-full: "1"
+      repo1-retention-full-type: count
+      # Imports write a lot of WAL: keep it only from the latest backup (full
+      # or diff) on. Older backups stay restorable, but not to points between.
+      repo1-retention-archive-type: diff
+      repo1-retention-archive: "1"
+      compress-type: zst
+      process-max: "4"
+      archive-async: "y"
+      archive-push-queue-max: 64GiB
+    repos:
+      - name: repo1
+        s3:
+          bucket: eoapi-dev-pgbackrest
+          endpoint: rgw.cscs.ch
+          # Ceph RGW ignores it, but pgBackRest requires one.
+          region: us-east-1
+        schedules:
+          full: "0 1 * * 0"
+          differential: "0 1 * * 1-6"
+  patroni:
+    dynamicConfiguration:
+      postgresql:
+        parameters:
+          # 1GB forced a checkpoint every ~8s during bulk imports. Costs at
+          # most 16GB of pg_wal while WAL archiving keeps up.
+          max_wal_size: 16GB
+          # pypgstac's loader plans SELECT * FROM items for every chunk, which
+          # locks all partitions and their indexes (~3200 locks at 635
+          # partitions) until the chunk commits. At the default 64, six
+          # imports fill the lock table and every query spanning the
+          # partitions, /stac searches too, fails with "out of shared memory".
+          # Takes effect on a restart.
+          max_locks_per_transaction: 1024
+
+pgstacBootstrap:
+  settings:
+    # An import running as eoapi once held 91 of the 97 non-superuser
+    # connections and every /stac query failed with TooManyConnectionsError.
+    # So every role is capped: eoapi (bootstrap jobs) at 30, bulk imports
+    # connect as eoapi-ingest, and stac, raster and vector share the read-only
+    # eoapi-stac (~20 connections at rest; their pool ceilings add up to 102).
+    # With eoapi and eoapi-ingest both at their caps, the APIs still have 27.
+    # Both extra roles use eoapi's password (from the eoapi-pguser-eoapi Secret).
+    userConnectionLimit: 30
+    extraUsers:
+      - name: eoapi-ingest
+        connectionLimit: 40
+        memberOf: [pgstac_ingest]
+      - name: eoapi-stac
+        connectionLimit: 50
+        memberOf: [pgstac_read]
 
 postgrescluster-narthex:
   enabled: true

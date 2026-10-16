@@ -1,0 +1,34 @@
+# Direct access to the pgSTAC primary from santis, for bulk imports that would
+# otherwise go through `kubectl port-forward`. MetalLB address; kube-proxy
+# enforces the source range against the client's own address.
+#
+#  - The selector must name the cluster: `role: master` alone also matches the
+#    narthex and authelia primaries, and the Service balanced across all three.
+#  - externalTrafficPolicy Local keeps the client address, so pg_stat_activity
+#    shows which santis node a connection comes from.
+#  - pg_hba allows md5 from anywhere, so the source range is the only network
+#    restriction. Imports connect as eoapi-ingest (capped) with sslmode=require.
+apiVersion: v1
+kind: Service
+metadata:
+  name: pgstac-postgres-direct
+  namespace: eoapi-dev
+  labels:
+    app.kubernetes.io/name: pgstac-postgres-direct
+    app.kubernetes.io/part-of: eoapi-dev
+  annotations:
+    metallb.io/loadBalancerIPs: 148.187.24.43
+spec:
+  type: LoadBalancer
+  externalTrafficPolicy: Local
+  selector:
+    postgres-operator.crunchydata.com/cluster: eoapi
+    postgres-operator.crunchydata.com/role: master
+  loadBalancerSourceRanges:
+    # santis HSN: login nodes reach the cluster from 172.28.x.x.
+    - 172.28.0.0/16
+  ports:
+    - name: postgres
+      port: 5432
+      targetPort: 5432
+      protocol: TCP
