@@ -17,8 +17,14 @@
     Earth-observation, field-campaign and model data catalogued by C2SM on
     CSCS infrastructure, grouped by mission, product family and campaign.
 
-    Every collection also appears, ungrouped, in the full collection list on the
-    API landing page, and all of them can be found with the search.
+    **What you see depends on your login.** Without logging in you see only
+    public collections; once logged in you also see the collections your groups
+    give you access to. The same catalog can therefore list more or fewer
+    collections for different people, and may look empty until you log in.
+
+    Every collection you can access also appears, ungrouped, in the full
+    collection list on the API landing page, and all of them can be found with
+    the search.
 
     Preview images: we acknowledge the use of imagery provided by services from
     NASA's Global Imagery Browse Services (GIBS), part of NASA's Earth Science
