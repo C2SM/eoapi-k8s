@@ -54,6 +54,9 @@ RUN --mount=type=secret,id=narthex_repo_token \
 COPY patches/ /patches/
 RUN git apply --verbose /patches/*.patch
 
+# Keeps the Catalogs extension's raw-JSON links out of "Additional resources".
+COPY relationTypes.config.js ./relationTypes.config.js
+
 RUN npm install
 RUN [ "${DYNAMIC_CONFIG}" = "true" ] && sed -i 's/<!--RC//;s/RC-->//' index.html
 RUN npm run build
