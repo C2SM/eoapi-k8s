@@ -1,0 +1,927 @@
+# Catalog tree served by the stac-fastapi-pgstac Catalogs extension
+# (/stac/catalogs/<id>, browsable at /browser/catalogs/prometheus).
+# Each entry becomes a `type: Catalog` row in pgstac.collections; nesting
+# becomes `parent_ids`. Which collections land in which leaf is decided by the
+# rules in load_catalogs.py, which also reads this file.
+#
+# preview: image shown on the catalog's card and page. Must be JPEG/PNG/WebP
+# (stac-browser does not display SVG thumbnails).
+
+- id: prometheus
+  title: PromETHeus
+  preview:
+    href: "https://gibs.earthdata.nasa.gov/wms/epsg4326/best/wms.cgi?SERVICE=WMS&REQUEST=GetMap&VERSION=1.1.1&LAYERS=BlueMarble_ShadedRelief_Bathymetry&STYLES=&SRS=EPSG:4326&BBOX=-160,-90,160,90&WIDTH=640&HEIGHT=360&FORMAT=image/jpeg"
+    type: image/jpeg
+    title: "NASA GIBS: BlueMarble_ShadedRelief_Bathymetry"
+  description: |
+    Earth-observation, field-campaign and model data catalogued by C2SM on
+    CSCS infrastructure, grouped by mission, product family and campaign.
+
+    Every collection also appears, ungrouped, in the full collection list on the
+    API landing page, and all of them can be found with the search.
+
+    Preview images: we acknowledge the use of imagery provided by services from
+    NASA's Global Imagery Browse Services (GIBS), part of NASA's Earth Science
+    Data and Information System (ESDIS). Where GIBS has no layer for a group's
+    own data, the image is an illustration of the same region or theme.
+  children:
+
+  - id: c2sm-model-output
+    title: C2SM model output
+    preview:
+      href: "https://gibs.earthdata.nasa.gov/wms/epsg4326/best/wms.cgi?SERVICE=WMS&REQUEST=GetMap&VERSION=1.1.1&LAYERS=MERRA2_Surface_Wind_Speed_Monthly&STYLES=&SRS=EPSG:4326&BBOX=-160,-90,160,90&WIDTH=640&HEIGHT=360&FORMAT=image/jpeg&TIME=2023-08-01"
+      type: image/jpeg
+      title: "NASA GIBS: MERRA2_Surface_Wind_Speed_Monthly, 2023-08-01"
+    description: |
+      Simulations produced or post-processed at C2SM and stored at CSCS.
+    children:
+    - id: dyamond
+      title: DYAMOND
+      preview:
+        href: "https://gibs.earthdata.nasa.gov/wms/epsg4326/best/wms.cgi?SERVICE=WMS&REQUEST=GetMap&VERSION=1.1.1&LAYERS=VIIRS_NOAA20_CorrectedReflectance_TrueColor&STYLES=&SRS=EPSG:4326&BBOX=-145,-82,125,70&WIDTH=640&HEIGHT=360&FORMAT=image/jpeg&TIME=2020-02-01"
+        type: image/jpeg
+        title: "NASA GIBS: VIIRS_NOAA20_CorrectedReflectance_TrueColor, 2020-02-01"
+      description: |
+        Global storm-resolving ICON simulations following the DYAMOND
+        (DYnamics of the Atmospheric general circulation Modeled On
+        Non-hydrostatic Domains) protocol, starting 20 January 2020.
+
+        Runs at R02B06 (~40 km), R02B08 (~10 km) and R02B10 (~2.5 km), including
+        the OpenACC GPU port, ICON-EXCLAIM and a shallow-convection-only
+        experiment. Output streams hold one variable per file, on the native ICON
+        grid or remapped to a regular latitude-longitude grid.
+
+  - id: modis
+    title: MODIS
+    preview:
+      href: "https://gibs.earthdata.nasa.gov/wms/epsg4326/best/wms.cgi?SERVICE=WMS&REQUEST=GetMap&VERSION=1.1.1&LAYERS=MODIS_Aqua_CorrectedReflectance_TrueColor&STYLES=&SRS=EPSG:4326&BBOX=-83,21.9407,-73,27.0593&WIDTH=640&HEIGHT=360&FORMAT=image/jpeg&TIME=2021-03-10"
+      type: image/jpeg
+      title: "NASA GIBS: MODIS_Aqua_CorrectedReflectance_TrueColor, 2021-03-10"
+    description: |
+      Land products from the Moderate Resolution Imaging Spectroradiometer on
+      NASA's Terra (morning orbit, since 2000) and Aqua (afternoon orbit, since
+      2002) satellites, distributed by the LP DAAC. 36 spectral bands at 250 m to
+      1 km.
+
+      Titles follow NASA's pattern *platform / product / cadence / level / grid /
+      version*: `Terra+Aqua` means combined, `SIN Grid` products are tiled,
+      `CMG` products are global 0.05° grids, and `V006`/`V061` are Collections 6
+      and 6.1.
+    children:
+    - id: modis-brdf-albedo
+      title: MODIS BRDF/Albedo
+      preview:
+        href: "https://gibs.earthdata.nasa.gov/wms/epsg4326/best/wms.cgi?SERVICE=WMS&REQUEST=GetMap&VERSION=1.1.1&LAYERS=MODIS_Combined_L3_Black_Sky_Albedo_Daily&STYLES=&SRS=EPSG:4326&BBOX=70,23.4135,106,40.5865&WIDTH=640&HEIGHT=360&FORMAT=image/jpeg&TIME=2023-03-15"
+        type: image/jpeg
+        title: "NASA GIBS: MODIS_Combined_L3_Black_Sky_Albedo_Daily, 2023-03-15"
+      description: |
+        The MCD43 family: a kernel-driven model of how surface reflectance varies
+        with view and sun angle (the BRDF), fitted daily from 16 days of Terra and
+        Aqua observations, and the albedo and nadir reflectance derived from it.
+
+        Most products come as one collection per spectral band, which is why this
+        group is large.
+      children:
+      - id: modis-brdf-albedo-albedo
+        title: MODIS albedo
+        preview:
+          href: "https://gibs.earthdata.nasa.gov/wms/epsg4326/best/wms.cgi?SERVICE=WMS&REQUEST=GetMap&VERSION=1.1.1&LAYERS=BlueMarble_ShadedRelief_Bathymetry,MODIS_Combined_L3_White_Sky_Albedo_Daily&STYLES=&SRS=EPSG:4326&BBOX=0,4.1427,60,35.8573&WIDTH=640&HEIGHT=360&FORMAT=image/jpeg&TIME=2023-06-15"
+          type: image/jpeg
+          title: "NASA GIBS: BlueMarble_ShadedRelief_Bathymetry, MODIS_Combined_L3_White_Sky_Albedo_Daily, 2023-06-15"
+        description: |
+          Black-sky (directional) and white-sky (diffuse) albedo at local solar
+          noon, per band and for the visible, near-infrared and shortwave
+          broadbands.
+      - id: modis-brdf-albedo-model-parameters
+        title: MODIS BRDF model parameters
+        preview:
+          href: "https://gibs.earthdata.nasa.gov/wms/epsg4326/best/wms.cgi?SERVICE=WMS&REQUEST=GetMap&VERSION=1.1.1&LAYERS=MODIS_Combined_MAIAC_L3_IsotropicKernelParameters&STYLES=&SRS=EPSG:4326&BBOX=112.5,-35.4875,156.5,-12.9125&WIDTH=640&HEIGHT=360&FORMAT=image/jpeg&TIME=2022-09-16"
+          type: image/jpeg
+          title: "NASA GIBS: MODIS_Combined_MAIAC_L3_IsotropicKernelParameters, 2022-09-16"
+        description: |
+          The three kernel weights (isotropic, volumetric, geometric) of the
+          BRDF model, per band. Use these to compute reflectance or albedo for
+          any sun and view geometry.
+      - id: modis-brdf-albedo-nbar
+        title: MODIS nadir BRDF-adjusted reflectance
+        preview:
+          href: "https://gibs.earthdata.nasa.gov/wms/epsg4326/best/wms.cgi?SERVICE=WMS&REQUEST=GetMap&VERSION=1.1.1&LAYERS=MODIS_Combined_L3_Nadir-BRDF_Daily&STYLES=&SRS=EPSG:4326&BBOX=0,44.3856,28,54.6144&WIDTH=640&HEIGHT=360&FORMAT=image/jpeg&TIME=2023-08-15"
+          type: image/jpeg
+          title: "NASA GIBS: MODIS_Combined_L3_Nadir-BRDF_Daily, 2023-08-15"
+        description: |
+          Surface reflectance normalised to a nadir view at local solar noon
+          (NBAR): free of view-angle effects, so pixels and dates are directly
+          comparable.
+      - id: modis-brdf-albedo-quality
+        title: MODIS BRDF/Albedo quality
+        preview:
+          href: "https://gibs.earthdata.nasa.gov/wms/epsg4326/best/wms.cgi?SERVICE=WMS&REQUEST=GetMap&VERSION=1.1.1&LAYERS=MODIS_Terra_L3_Land_Water_Mask&STYLES=&SRS=EPSG:4326&BBOX=-95,48.5473,-55,61.4527&WIDTH=640&HEIGHT=360&FORMAT=image/jpeg&TIME=2015-01-01"
+          type: image/jpeg
+          title: "NASA GIBS: MODIS_Terra_L3_Land_Water_Mask, 2015-01-01"
+        description: |
+          Quality flags, snow status, local solar noon, valid-observation counts
+          and uncertainty layers that accompany the BRDF/Albedo products.
+    - id: modis-land-surface-temperature
+      title: MODIS land surface temperature
+      preview:
+        href: "https://gibs.earthdata.nasa.gov/wms/epsg4326/best/wms.cgi?SERVICE=WMS&REQUEST=GetMap&VERSION=1.1.1&LAYERS=BlueMarble_ShadedRelief_Bathymetry,MODIS_Terra_L3_Land_Surface_Temp_Monthly_Day&STYLES=&SRS=EPSG:4326&BBOX=-15,3.2073,95,56.7927&WIDTH=640&HEIGHT=360&FORMAT=image/jpeg&TIME=2022-07-01"
+        type: image/jpeg
+        title: "NASA GIBS: BlueMarble_ShadedRelief_Bathymetry, MODIS_Terra_L3_Land_Surface_Temp_Monthly_Day, 2022-07-01"
+      description: |
+        Land surface temperature and emissivity: the split-window products
+        (MOD11/MYD11) and the three-band temperature-emissivity separation
+        products (MOD21/MYD21), from 5-minute swaths to 8-day and monthly
+        global grids.
+    - id: modis-vegetation
+      title: MODIS vegetation
+      preview:
+        href: "https://gibs.earthdata.nasa.gov/wms/epsg4326/best/wms.cgi?SERVICE=WMS&REQUEST=GetMap&VERSION=1.1.1&LAYERS=BlueMarble_ShadedRelief_Bathymetry,MODIS_Terra_L3_NDVI_Monthly&STYLES=&SRS=EPSG:4326&BBOX=0,-3.1405,40,19.1405&WIDTH=640&HEIGHT=360&FORMAT=image/jpeg&TIME=2022-08-01"
+        type: image/jpeg
+        title: "NASA GIBS: BlueMarble_ShadedRelief_Bathymetry, MODIS_Terra_L3_NDVI_Monthly, 2022-08-01"
+      description: |
+        Vegetation indices (NDVI, EVI), leaf area index and the fraction of
+        absorbed photosynthetically active radiation (LAI/FPAR), land cover
+        dynamics (phenology) and vegetation continuous fields.
+    - id: modis-productivity-et
+      title: MODIS productivity & evapotranspiration
+      preview:
+        href: "https://gibs.earthdata.nasa.gov/wms/epsg4326/best/wms.cgi?SERVICE=WMS&REQUEST=GetMap&VERSION=1.1.1&LAYERS=BlueMarble_ShadedRelief_Bathymetry,MODIS_Terra_L4_Gross_Primary_Productivity_8Day&STYLES=&SRS=EPSG:4326&BBOX=-125,33.0676,-65,56.9324&WIDTH=640&HEIGHT=360&FORMAT=image/jpeg&TIME=2022-07-12"
+        type: image/jpeg
+        title: "NASA GIBS: BlueMarble_ShadedRelief_Bathymetry, MODIS_Terra_L4_Gross_Primary_Productivity_8Day, 2022-07-12"
+      description: |
+        Gross and net primary productivity (MOD17), evapotranspiration and
+        latent heat flux (MOD16), and photosynthetically active radiation,
+        including the gap-filled versions.
+    - id: modis-surface-reflectance
+      title: MODIS surface reflectance
+      preview:
+        href: "https://gibs.earthdata.nasa.gov/wms/epsg4326/best/wms.cgi?SERVICE=WMS&REQUEST=GetMap&VERSION=1.1.1&LAYERS=MODIS_Terra_L3_SurfaceReflectance_Bands721_8Day&STYLES=&SRS=EPSG:4326&BBOX=37.5,19.6804,62.5,32.3196&WIDTH=640&HEIGHT=360&FORMAT=image/jpeg&TIME=2022-10-08"
+        type: image/jpeg
+        title: "NASA GIBS: MODIS_Terra_L3_SurfaceReflectance_Bands721_8Day, 2022-10-08"
+      description: |
+        Atmospherically corrected surface reflectance (MOD09/MYD09), including
+        the MAIAC products, which also carry aerosol, water vapour and snow
+        layers.
+    - id: modis-fire
+      title: MODIS fire
+      preview:
+        href: "https://gibs.earthdata.nasa.gov/wms/epsg4326/best/wms.cgi?SERVICE=WMS&REQUEST=GetMap&VERSION=1.1.1&LAYERS=MODIS_Terra_CorrectedReflectance_TrueColor,MODIS_Combined_Thermal_Anomalies_All&STYLES=&SRS=EPSG:4326&BBOX=-125,33.787,-113,39.213&WIDTH=640&HEIGHT=360&FORMAT=image/jpeg&TIME=2020-09-09"
+        type: image/jpeg
+        title: "NASA GIBS: MODIS_Terra_CorrectedReflectance_TrueColor, MODIS_Combined_Thermal_Anomalies_All, 2020-09-09"
+      description: |
+        Thermal anomalies and active fire detections (MOD14/MYD14), and monthly
+        direct-broadcast burned area.
+    - id: modis-land-cover-water
+      title: MODIS land cover & water
+      preview:
+        href: "https://gibs.earthdata.nasa.gov/wms/epsg4326/best/wms.cgi?SERVICE=WMS&REQUEST=GetMap&VERSION=1.1.1&LAYERS=MODIS_Combined_L3_IGBP_Land_Cover_Type_Annual&STYLES=&SRS=EPSG:4326&BBOX=-7.5,41.8647,37.5,58.1353&WIDTH=640&HEIGHT=360&FORMAT=image/jpeg&TIME=2022-01-01"
+        type: image/jpeg
+        title: "NASA GIBS: MODIS_Combined_L3_IGBP_Land_Cover_Type_Annual, 2022-01-01"
+      description: |
+        Annual land cover type (500 m and 0.05°), water reservoir area, and the
+        250 m land-water mask derived from MODIS and SRTM.
+    - id: modis-radiation-aerosol
+      title: MODIS radiation & aerosol
+      preview:
+        href: "https://gibs.earthdata.nasa.gov/wms/epsg4326/best/wms.cgi?SERVICE=WMS&REQUEST=GetMap&VERSION=1.1.1&LAYERS=MODIS_Aqua_CorrectedReflectance_TrueColor,MODIS_Combined_MAIAC_L2G_AerosolOpticalDepth&STYLES=&SRS=EPSG:4326&BBOX=70,21.9881,90,32.0119&WIDTH=640&HEIGHT=360&FORMAT=image/jpeg&TIME=2019-11-20"
+        type: image/jpeg
+        title: "NASA GIBS: MODIS_Aqua_CorrectedReflectance_TrueColor, MODIS_Combined_MAIAC_L2G_AerosolOpticalDepth, 2019-11-20"
+      description: |
+        Downward shortwave and surface radiation, and aerosol optical depth over
+        land.
+
+  - id: viirs
+    title: VIIRS
+    preview:
+      href: "https://gibs.earthdata.nasa.gov/wms/epsg4326/best/wms.cgi?SERVICE=WMS&REQUEST=GetMap&VERSION=1.1.1&LAYERS=VIIRS_SNPP_CorrectedReflectance_TrueColor&STYLES=&SRS=EPSG:4326&BBOX=4.5,38.6558,20.5,45.3442&WIDTH=640&HEIGHT=360&FORMAT=image/jpeg&TIME=2022-07-20"
+      type: image/jpeg
+      title: "NASA GIBS: VIIRS_SNPP_CorrectedReflectance_TrueColor, 2022-07-20"
+    description: |
+      Land products from the Visible Infrared Imaging Radiometer Suite on Suomi
+      NPP (since 2011), NOAA-20 / JPSS-1 (since 2017) and NOAA-21 / JPSS-2
+      (since 2022), distributed by the LP DAAC. VIIRS continues the MODIS land
+      record at 375 m and 750 m.
+
+      Titles name the satellite (`NPP`, `JPSS1`, `JPSS2`) and the version
+      (`V001`, `V002`).
+    children:
+    - id: viirs-brdf-albedo
+      title: VIIRS BRDF/Albedo
+      preview:
+        href: "https://gibs.earthdata.nasa.gov/wms/epsg4326/best/wms.cgi?SERVICE=WMS&REQUEST=GetMap&VERSION=1.1.1&LAYERS=VIIRS_SNPP_L3_SurfaceReflectance_BandsM5-M4-M3_8Day&STYLES=&SRS=EPSG:4326&BBOX=5,44.564,15,48.436&WIDTH=640&HEIGHT=360&FORMAT=image/jpeg&TIME=2022-02-18"
+        type: image/jpeg
+        title: "NASA GIBS: VIIRS_SNPP_L3_SurfaceReflectance_BandsM5-M4-M3_8Day, 2022-02-18"
+      description: |
+        The VNP43 family (and its JPSS equivalents): the same kernel-driven BRDF
+        model as MODIS MCD43, fitted daily per satellite, plus the albedo and
+        nadir reflectance derived from it, including Day/Night Band products.
+
+        With one collection per band and per satellite, albedo and model
+        parameters are split further by satellite.
+      children:
+      - id: viirs-brdf-albedo-albedo
+        title: VIIRS albedo
+        preview:
+          href: "https://gibs.earthdata.nasa.gov/wms/epsg4326/best/wms.cgi?SERVICE=WMS&REQUEST=GetMap&VERSION=1.1.1&LAYERS=VIIRS_SNPP_CorrectedReflectance_TrueColor&STYLES=&SRS=EPSG:4326&BBOX=77,25.6157,95,34.3843&WIDTH=640&HEIGHT=360&FORMAT=image/jpeg&TIME=2021-12-10"
+          type: image/jpeg
+          title: "NASA GIBS: VIIRS_SNPP_CorrectedReflectance_TrueColor, 2021-12-10"
+        description: |
+          Black-sky (directional) and white-sky (diffuse) albedo at local solar
+          noon, per band and broadband, one group per satellite.
+        children:
+        - id: viirs-brdf-albedo-albedo-npp
+          title: VIIRS albedo · Suomi NPP
+          preview:
+            href: "https://gibs.earthdata.nasa.gov/wms/epsg4326/best/wms.cgi?SERVICE=WMS&REQUEST=GetMap&VERSION=1.1.1&LAYERS=VIIRS_SNPP_SurfaceReflectance_BandsM5-M4-M3&STYLES=&SRS=EPSG:4326&BBOX=-70.5,-21.7837,-64.5,-18.6163&WIDTH=640&HEIGHT=360&FORMAT=image/jpeg&TIME=2022-08-15"
+            type: image/jpeg
+            title: "NASA GIBS: VIIRS_SNPP_SurfaceReflectance_BandsM5-M4-M3, 2022-08-15"
+          description: Black-sky and white-sky albedo from VIIRS on Suomi NPP.
+        - id: viirs-brdf-albedo-albedo-jpss1
+          title: VIIRS albedo · NOAA-20 (JPSS-1)
+          preview:
+            href: "https://gibs.earthdata.nasa.gov/wms/epsg4326/best/wms.cgi?SERVICE=WMS&REQUEST=GetMap&VERSION=1.1.1&LAYERS=VIIRS_NOAA20_CorrectedReflectance_TrueColor&STYLES=&SRS=EPSG:4326&BBOX=-77,-50.9613,-69,-48.0387&WIDTH=640&HEIGHT=360&FORMAT=image/jpeg&TIME=2022-02-04"
+            type: image/jpeg
+            title: "NASA GIBS: VIIRS_NOAA20_CorrectedReflectance_TrueColor, 2022-02-04"
+          description: Black-sky and white-sky albedo from VIIRS on NOAA-20 (JPSS-1).
+        - id: viirs-brdf-albedo-albedo-jpss2
+          title: VIIRS albedo · NOAA-21 (JPSS-2)
+          preview:
+            href: "https://gibs.earthdata.nasa.gov/wms/epsg4326/best/wms.cgi?SERVICE=WMS&REQUEST=GetMap&VERSION=1.1.1&LAYERS=VIIRS_NOAA21_CorrectedReflectance_TrueColor&STYLES=&SRS=EPSG:4326&BBOX=-22.7,63.9456,-14.7,65.8544&WIDTH=640&HEIGHT=360&FORMAT=image/jpeg&TIME=2024-07-07"
+            type: image/jpeg
+            title: "NASA GIBS: VIIRS_NOAA21_CorrectedReflectance_TrueColor, 2024-07-07"
+          description: Black-sky and white-sky albedo from VIIRS on NOAA-21 (JPSS-2).
+      - id: viirs-brdf-albedo-model-parameters
+        title: VIIRS BRDF model parameters
+        preview:
+          href: "https://gibs.earthdata.nasa.gov/wms/epsg4326/best/wms.cgi?SERVICE=WMS&REQUEST=GetMap&VERSION=1.1.1&LAYERS=VIIRS_SNPP_CorrectedReflectance_BandsM11-I2-I1&STYLES=&SRS=EPSG:4326&BBOX=28.5,29.3896,33.5,31.8104&WIDTH=640&HEIGHT=360&FORMAT=image/jpeg&TIME=2022-11-10"
+          type: image/jpeg
+          title: "NASA GIBS: VIIRS_SNPP_CorrectedReflectance_BandsM11-I2-I1, 2022-11-10"
+        description: |
+          The three kernel weights (isotropic, volumetric, geometric) of the BRDF
+          model, per band, one group per satellite.
+        children:
+        - id: viirs-brdf-albedo-model-parameters-npp
+          title: VIIRS BRDF parameters · Suomi NPP
+          preview:
+            href: "https://gibs.earthdata.nasa.gov/wms/epsg4326/best/wms.cgi?SERVICE=WMS&REQUEST=GetMap&VERSION=1.1.1&LAYERS=VIIRS_SNPP_SurfaceReflectance_BandsM11-M7-M5&STYLES=&SRS=EPSG:4326&BBOX=130,-31.9603,144,-25.0397&WIDTH=640&HEIGHT=360&FORMAT=image/jpeg&TIME=2022-05-10"
+            type: image/jpeg
+            title: "NASA GIBS: VIIRS_SNPP_SurfaceReflectance_BandsM11-M7-M5, 2022-05-10"
+          description: BRDF model parameters from VIIRS on Suomi NPP.
+        - id: viirs-brdf-albedo-model-parameters-jpss1
+          title: VIIRS BRDF parameters · NOAA-20 (JPSS-1)
+          preview:
+            href: "https://gibs.earthdata.nasa.gov/wms/epsg4326/best/wms.cgi?SERVICE=WMS&REQUEST=GetMap&VERSION=1.1.1&LAYERS=VIIRS_NOAA20_SurfaceReflectance_BandsM11-M7-M5&STYLES=&SRS=EPSG:4326&BBOX=12,11.9038,16,14.0962&WIDTH=640&HEIGHT=360&FORMAT=image/jpeg&TIME=2022-12-10"
+            type: image/jpeg
+            title: "NASA GIBS: VIIRS_NOAA20_SurfaceReflectance_BandsM11-M7-M5, 2022-12-10"
+          description: BRDF model parameters from VIIRS on NOAA-20 (JPSS-1).
+        - id: viirs-brdf-albedo-model-parameters-jpss2
+          title: VIIRS BRDF parameters · NOAA-21 (JPSS-2)
+          preview:
+            href: "https://gibs.earthdata.nasa.gov/wms/epsg4326/best/wms.cgi?SERVICE=WMS&REQUEST=GetMap&VERSION=1.1.1&LAYERS=VIIRS_NOAA21_CorrectedReflectance_BandsM11-I2-I1&STYLES=&SRS=EPSG:4326&BBOX=-117,34.2392,-107,38.7608&WIDTH=640&HEIGHT=360&FORMAT=image/jpeg&TIME=2024-05-19"
+            type: image/jpeg
+            title: "NASA GIBS: VIIRS_NOAA21_CorrectedReflectance_BandsM11-I2-I1, 2024-05-19"
+          description: BRDF model parameters from VIIRS on NOAA-21 (JPSS-2).
+      - id: viirs-brdf-albedo-nbar
+        title: VIIRS nadir BRDF-adjusted reflectance
+        preview:
+          href: "https://gibs.earthdata.nasa.gov/wms/epsg4326/best/wms.cgi?SERVICE=WMS&REQUEST=GetMap&VERSION=1.1.1&LAYERS=VIIRS_SNPP_L3_SurfaceReflectance_BandsM5-M4-M3_8Day&STYLES=&SRS=EPSG:4326&BBOX=22,3.3525,46,16.6475&WIDTH=640&HEIGHT=360&FORMAT=image/jpeg&TIME=2022-10-08"
+          type: image/jpeg
+          title: "NASA GIBS: VIIRS_SNPP_L3_SurfaceReflectance_BandsM5-M4-M3_8Day, 2022-10-08"
+        description: |
+          Surface reflectance normalised to a nadir view at local solar noon
+          (NBAR), per band, from all three satellites.
+      - id: viirs-brdf-albedo-quality
+        title: VIIRS BRDF/Albedo quality
+        preview:
+          href: "https://gibs.earthdata.nasa.gov/wms/epsg4326/best/wms.cgi?SERVICE=WMS&REQUEST=GetMap&VERSION=1.1.1&LAYERS=VIIRS_SNPP_Clear_Sky_Confidence_Day&STYLES=&SRS=EPSG:4326&BBOX=-10,37.045,30,52.955&WIDTH=640&HEIGHT=360&FORMAT=image/jpeg&TIME=2022-07-20"
+          type: image/jpeg
+          title: "NASA GIBS: VIIRS_SNPP_Clear_Sky_Confidence_Day, 2022-07-20"
+        description: |
+          Quality flags, snow status, local solar noon, valid-observation counts
+          and uncertainty layers that accompany the BRDF/Albedo products.
+    - id: viirs-land-surface-temperature
+      title: VIIRS land surface temperature
+      preview:
+        href: "https://gibs.earthdata.nasa.gov/wms/epsg4326/best/wms.cgi?SERVICE=WMS&REQUEST=GetMap&VERSION=1.1.1&LAYERS=BlueMarble_ShadedRelief_Bathymetry,VIIRS_SNPP_L3_Land_Surface_Temp_Monthly_Day&STYLES=&SRS=EPSG:4326&BBOX=110,-38.1337,158,-13.8663&WIDTH=640&HEIGHT=360&FORMAT=image/jpeg&TIME=2023-01-01"
+        type: image/jpeg
+        title: "NASA GIBS: BlueMarble_ShadedRelief_Bathymetry, VIIRS_SNPP_L3_Land_Surface_Temp_Monthly_Day, 2023-01-01"
+      description: |
+        Land surface temperature and emissivity from swaths to daily and 8-day
+        global grids.
+    - id: viirs-vegetation
+      title: VIIRS vegetation
+      preview:
+        href: "https://gibs.earthdata.nasa.gov/wms/epsg4326/best/wms.cgi?SERVICE=WMS&REQUEST=GetMap&VERSION=1.1.1&LAYERS=BlueMarble_ShadedRelief_Bathymetry,VIIRS_SNPP_L3_NDVI_Monthly&STYLES=&SRS=EPSG:4326&BBOX=-85,-28.5833,-35,-1.4167&WIDTH=640&HEIGHT=360&FORMAT=image/jpeg&TIME=2022-03-01"
+        type: image/jpeg
+        title: "NASA GIBS: BlueMarble_ShadedRelief_Bathymetry, VIIRS_SNPP_L3_NDVI_Monthly, 2022-03-01"
+      description: |
+        Vegetation indices (NDVI, EVI), leaf area index / FPAR and land surface
+        phenology.
+    - id: viirs-productivity-et
+      title: VIIRS productivity & evapotranspiration
+      preview:
+        href: "https://gibs.earthdata.nasa.gov/wms/epsg4326/best/wms.cgi?SERVICE=WMS&REQUEST=GetMap&VERSION=1.1.1&LAYERS=BlueMarble_ShadedRelief_Bathymetry,VIIRS_SNPP_L4_Gross_Primary_Productivity_8Day&STYLES=&SRS=EPSG:4326&BBOX=-10,43.3423,40,60.6577&WIDTH=640&HEIGHT=360&FORMAT=image/jpeg&TIME=2022-06-26"
+        type: image/jpeg
+        title: "NASA GIBS: BlueMarble_ShadedRelief_Bathymetry, VIIRS_SNPP_L4_Gross_Primary_Productivity_8Day, 2022-06-26"
+      description: |
+        Gross and net primary productivity, evapotranspiration and
+        photosynthetically active radiation.
+    - id: viirs-surface-reflectance
+      title: VIIRS surface reflectance
+      preview:
+        href: "https://gibs.earthdata.nasa.gov/wms/epsg4326/best/wms.cgi?SERVICE=WMS&REQUEST=GetMap&VERSION=1.1.1&LAYERS=VIIRS_SNPP_SurfaceReflectance_BandsM5-M4-M3&STYLES=&SRS=EPSG:4326&BBOX=32,7.5983,48,16.4017&WIDTH=640&HEIGHT=360&FORMAT=image/jpeg&TIME=2022-01-20"
+        type: image/jpeg
+        title: "NASA GIBS: VIIRS_SNPP_SurfaceReflectance_BandsM5-M4-M3, 2022-01-20"
+      description: |
+        Atmospherically corrected surface reflectance and bidirectional
+        reflectance factor (BRF), daily and 8-day, including the combined
+        NPP+JPSS MAIAC products.
+    - id: viirs-fire
+      title: VIIRS fire
+      preview:
+        href: "https://gibs.earthdata.nasa.gov/wms/epsg4326/best/wms.cgi?SERVICE=WMS&REQUEST=GetMap&VERSION=1.1.1&LAYERS=VIIRS_SNPP_CorrectedReflectance_TrueColor,VIIRS_SNPP_Thermal_Anomalies_375m_All&STYLES=&SRS=EPSG:4326&BBOX=145,-38.3087,153,-34.6913&WIDTH=640&HEIGHT=360&FORMAT=image/jpeg&TIME=2020-01-04"
+        type: image/jpeg
+        title: "NASA GIBS: VIIRS_SNPP_CorrectedReflectance_TrueColor, VIIRS_SNPP_Thermal_Anomalies_375m_All, 2020-01-04"
+      description: |
+        375 m and 750 m active fire and thermal anomaly detections, burned area
+        and the FILDA-2 fire combustion efficiency products.
+    - id: viirs-land-cover-water
+      title: VIIRS water reservoirs
+      preview:
+        href: "https://gibs.earthdata.nasa.gov/wms/epsg4326/best/wms.cgi?SERVICE=WMS&REQUEST=GetMap&VERSION=1.1.1&LAYERS=VIIRS_SNPP_CorrectedReflectance_BandsM11-I2-I1&STYLES=&SRS=EPSG:4326&BBOX=65.2,25.2938,71.2,28.3062&WIDTH=640&HEIGHT=360&FORMAT=image/jpeg&TIME=2022-09-09"
+        type: image/jpeg
+        title: "NASA GIBS: VIIRS_SNPP_CorrectedReflectance_BandsM11-I2-I1, 2022-09-09"
+      description: |
+        Water reservoir area, 8-day and monthly, from all three satellites.
+    - id: viirs-radiation-aerosol
+      title: VIIRS radiation & aerosol
+      preview:
+        href: "https://gibs.earthdata.nasa.gov/wms/epsg4326/best/wms.cgi?SERVICE=WMS&REQUEST=GetMap&VERSION=1.1.1&LAYERS=VIIRS_NOAA20_CorrectedReflectance_TrueColor,VIIRS_NOAA20_AOD_Deep_Blue_Land_Ocean&STYLES=&SRS=EPSG:4326&BBOX=-85,38.2378,-67,45.7622&WIDTH=640&HEIGHT=360&FORMAT=image/jpeg&TIME=2023-06-07"
+        type: image/jpeg
+        title: "NASA GIBS: VIIRS_NOAA20_CorrectedReflectance_TrueColor, VIIRS_NOAA20_AOD_Deep_Blue_Land_Ocean, 2023-06-07"
+      description: |
+        Downward shortwave radiation and aerosol optical thickness over land.
+    - id: viirs-geolocation
+      title: VIIRS geolocation
+      preview:
+        href: "https://gibs.earthdata.nasa.gov/wms/epsg4326/best/wms.cgi?SERVICE=WMS&REQUEST=GetMap&VERSION=1.1.1&LAYERS=VIIRS_Black_Marble&STYLES=&SRS=EPSG:4326&BBOX=-5,29.2275,45,50.7725&WIDTH=640&HEIGHT=360&FORMAT=image/jpeg&TIME=2016-01-01"
+        type: image/jpeg
+        title: "NASA GIBS: VIIRS_Black_Marble, 2016-01-01"
+      description: |
+        Terrain-corrected geolocation for the VIIRS moderate-resolution bands,
+        needed to work with the Level 1 and Level 2 swath products.
+
+  - id: land-missions
+    title: Other land missions
+    preview:
+      href: "https://gibs.earthdata.nasa.gov/wms/epsg4326/best/wms.cgi?SERVICE=WMS&REQUEST=GetMap&VERSION=1.1.1&LAYERS=HLS_S30_Nadir_BRDF_Adjusted_Reflectance&STYLES=&SRS=EPSG:4326&BBOX=37.95,29.9283,38.45,30.1717&WIDTH=640&HEIGHT=360&FORMAT=image/jpeg&TIME=2023-04-02"
+      type: image/jpeg
+      title: "NASA GIBS: HLS_S30_Nadir_BRDF_Adjusted_Reflectance, 2023-04-02"
+    description: |
+      Land-surface products from the LP DAAC outside the MODIS and VIIRS
+      families: space-station instruments, lidar, elevation, Landsat-based
+      records and model output.
+    children:
+    - id: ecostress
+      title: ECOSTRESS
+      preview:
+        href: "https://gibs.earthdata.nasa.gov/wms/epsg4326/best/wms.cgi?SERVICE=WMS&REQUEST=GetMap&VERSION=1.1.1&LAYERS=BlueMarble_ShadedRelief_Bathymetry,MODIS_Terra_L3_Land_Surface_Temp_8Day_Day&STYLES=&SRS=EPSG:4326&BBOX=-122,33.8972,-115,37.1028&WIDTH=640&HEIGHT=360&FORMAT=image/jpeg&TIME=2022-07-12"
+        type: image/jpeg
+        title: "NASA GIBS: BlueMarble_ShadedRelief_Bathymetry, MODIS_Terra_L3_Land_Surface_Temp_8Day_Day, 2022-07-12"
+      description: |
+        The ECOsystem Spaceborne Thermal Radiometer Experiment on Space Station
+        (since 2018): ~70 m land surface temperature and emissivity,
+        evapotranspiration, evaporative stress index and water use efficiency,
+        plus radiance, cloud masks and downscaled meteorology and soil moisture,
+        as swaths, grids and tiles.
+    - id: emit
+      title: EMIT
+      preview:
+        href: "https://gibs.earthdata.nasa.gov/wms/epsg4326/best/wms.cgi?SERVICE=WMS&REQUEST=GetMap&VERSION=1.1.1&LAYERS=MODIS_Aqua_CorrectedReflectance_TrueColor&STYLES=&SRS=EPSG:4326&BBOX=13,14.5794,22,19.4206&WIDTH=640&HEIGHT=360&FORMAT=image/jpeg&TIME=2023-02-13"
+        type: image/jpeg
+        title: "NASA GIBS: MODIS_Aqua_CorrectedReflectance_TrueColor, 2023-02-13"
+      description: |
+        The Earth Surface Mineral Dust Source Investigation, an imaging
+        spectrometer on the International Space Station (since 2022): 60 m
+        reflectance from 380 to 2500 nm, mineral identification for dust source
+        regions, methane and carbon dioxide plume detections, and the supporting
+        radiance and geometry products.
+    - id: aster-camel
+      title: ASTER & CAMEL
+      preview:
+        href: "https://gibs.earthdata.nasa.gov/wms/epsg4326/best/wms.cgi?SERVICE=WMS&REQUEST=GetMap&VERSION=1.1.1&LAYERS=ASTER_GDEM_Color_Shaded_Relief&STYLES=&SRS=EPSG:4326&BBOX=5.5,45.1341,11.5,47.4659&WIDTH=640&HEIGHT=360&FORMAT=image/jpeg"
+        type: image/jpeg
+        title: "NASA GIBS: ASTER_GDEM_Color_Shaded_Relief"
+      description: |
+        ASTER on Terra: Level 1 radiance, Level 2 surface reflectance,
+        temperature and emissivity, the ASTER Global DEM, the Global Water
+        Bodies Database and the Global Emissivity Dataset. Also CAMEL, the
+        Combined ASTER and MODIS Emissivity database over Land: monthly global
+        emissivity, its uncertainty and climatologies at 0.05°.
+    - id: gedi
+      title: GEDI
+      preview:
+        href: "https://gibs.earthdata.nasa.gov/wms/epsg4326/best/wms.cgi?SERVICE=WMS&REQUEST=GetMap&VERSION=1.1.1&LAYERS=BlueMarble_ShadedRelief_Bathymetry,GEDI_ISS_L3_Canopy_Height_Mean_RH100_201904-202303&STYLES=&SRS=EPSG:4326&BBOX=-86,-26.3054,-34,2.3054&WIDTH=640&HEIGHT=360&FORMAT=image/jpeg&TIME=2019-04-18"
+        type: image/jpeg
+        title: "NASA GIBS: BlueMarble_ShadedRelief_Bathymetry, GEDI_ISS_L3_Canopy_Height_Mean_RH100_201904-202303, 2019-04-18"
+      description: |
+        The Global Ecosystem Dynamics Investigation full-waveform lidar on the
+        International Space Station: ground elevation, canopy height and
+        vertical structure in ~25 m footprints.
+    - id: g-liht
+      title: G-LiHT
+      preview:
+        href: "https://gibs.earthdata.nasa.gov/wms/epsg4326/best/wms.cgi?SERVICE=WMS&REQUEST=GetMap&VERSION=1.1.1&LAYERS=HLS_S30_Nadir_BRDF_Adjusted_Reflectance&STYLES=&SRS=EPSG:4326&BBOX=-66.1,18.1398,-65.5,18.4602&WIDTH=640&HEIGHT=360&FORMAT=image/jpeg&TIME=2023-03-18"
+        type: image/jpeg
+        title: "NASA GIBS: HLS_S30_Nadir_BRDF_Adjusted_Reflectance, 2023-03-18"
+      description: |
+        Goddard's LiDAR, Hyperspectral & Thermal airborne imager: lidar point
+        clouds, canopy height and terrain models, hyperspectral reflectance and
+        orthomosaics, mostly over forests.
+    - id: elevation
+      title: Elevation (SRTM & NASADEM)
+      preview:
+        href: "https://gibs.earthdata.nasa.gov/wms/epsg4326/best/wms.cgi?SERVICE=WMS&REQUEST=GetMap&VERSION=1.1.1&LAYERS=SRTM_Color_Index&STYLES=&SRS=EPSG:4326&BBOX=70,22.6929,100,37.3071&WIDTH=640&HEIGHT=360&FORMAT=image/jpeg"
+        type: image/jpeg
+        title: "NASA GIBS: SRTM_Color_Index"
+      description: |
+        Global elevation from the Shuttle Radar Topography Mission (February
+        2000) at 1, 3 and 30 arc-seconds, its water body data, and NASADEM, the
+        reprocessed SRTM with improved void filling, plus slope and curvature.
+    - id: hls-opera-dist
+      title: HLS & OPERA land disturbance
+      preview:
+        href: "https://gibs.earthdata.nasa.gov/wms/epsg4326/best/wms.cgi?SERVICE=WMS&REQUEST=GetMap&VERSION=1.1.1&LAYERS=ASTER_GDEM_Greyscale_Shaded_Relief,OPERA_L3_DIST-ALERT-HLS_Color_Index&STYLES=&SRS=EPSG:4326&BBOX=-118.63,33.9903,-118.03,34.2697&WIDTH=640&HEIGHT=360&FORMAT=image/jpeg&TIME=2025-02-23"
+        type: image/jpeg
+        title: "NASA GIBS: ASTER_GDEM_Greyscale_Shaded_Relief, OPERA_L3_DIST-ALERT-HLS_Color_Index, 2025-02-23"
+      description: |
+        Harmonized Landsat Sentinel-2 (HLS) 30 m surface reflectance and
+        vegetation indices, and the OPERA land surface disturbance products
+        derived from them.
+    - id: cropland
+      title: Cropland
+      preview:
+        href: "https://gibs.earthdata.nasa.gov/wms/epsg4326/best/wms.cgi?SERVICE=WMS&REQUEST=GetMap&VERSION=1.1.1&LAYERS=Agricultural_Lands_Croplands_2000&STYLES=&SRS=EPSG:4326&BBOX=60,14.804,100,35.196&WIDTH=640&HEIGHT=360&FORMAT=image/jpeg"
+        type: image/jpeg
+        title: "NASA GIBS: Agricultural_Lands_Croplands_2000"
+      description: |
+        Global cropland extent, crop dominance and irrigated / rainfed cropland
+        maps (GFSAD, 2010–2015; LGRIP, 2020) and hyperspectral spectral libraries
+        of agricultural crops.
+    - id: landsat-derived
+      title: Landsat-derived records
+      preview:
+        href: "https://gibs.earthdata.nasa.gov/wms/epsg4326/best/wms.cgi?SERVICE=WMS&REQUEST=GetMap&VERSION=1.1.1&LAYERS=Landsat_WELD_NDVI_Global_Annual&STYLES=&SRS=EPSG:4326&BBOX=-110,31.3512,-80,44.6488&WIDTH=640&HEIGHT=360&FORMAT=image/jpeg&TIME=2000-12-01"
+        type: image/jpeg
+        title: "NASA GIBS: Landsat_WELD_NDVI_Global_Annual, 2000-12-01"
+      description: |
+        Web-Enabled Landsat Data (WELD) monthly and annual 30 m composites,
+        Global Forest Cover Change, GLanCE global land cover and MuSLI
+        multi-source land surface phenology.
+    - id: vegetation-climate-records
+      title: Vegetation climate records
+      preview:
+        href: "https://gibs.earthdata.nasa.gov/wms/epsg4326/best/wms.cgi?SERVICE=WMS&REQUEST=GetMap&VERSION=1.1.1&LAYERS=BlueMarble_ShadedRelief_Bathymetry,MODIS_Terra_L3_NDVI_Monthly&STYLES=&SRS=EPSG:4326&BBOX=-160,-90,160,90&WIDTH=640&HEIGHT=360&FORMAT=image/jpeg&TIME=2010-07-01"
+        type: image/jpeg
+        title: "NASA GIBS: BlueMarble_ShadedRelief_Bathymetry, MODIS_Terra_L3_NDVI_Monthly, 2010-07-01"
+      description: |
+        Long-term vegetation index and phenology records (VIP) and MEaSUREs
+        Vegetation Continuous Fields at 0.05°.
+    - id: lpj-models
+      title: LPJ model output
+      preview:
+        href: "https://gibs.earthdata.nasa.gov/wms/epsg4326/best/wms.cgi?SERVICE=WMS&REQUEST=GetMap&VERSION=1.1.1&LAYERS=AIRS_L3_Methane_400hPa_Volume_Mixing_Ratio_Monthly_Day&STYLES=&SRS=EPSG:4326&BBOX=-160,-90,160,90&WIDTH=640&HEIGHT=360&FORMAT=image/jpeg&TIME=2022-08-01"
+        type: image/jpeg
+        title: "NASA GIBS: AIRS_L3_Methane_400hPa_Volume_Mixing_Ratio_Monthly_Day, 2022-08-01"
+      description: |
+        Output of the LPJ dynamic vegetation model driven by Earth observations:
+        LPJ-EOSIM wetland methane fluxes and LPJ-PROSAIL simulated surface
+        reflectance.
+    - id: lst-climatologies
+      title: Land surface temperature records
+      preview:
+        href: "https://gibs.earthdata.nasa.gov/wms/epsg4326/best/wms.cgi?SERVICE=WMS&REQUEST=GetMap&VERSION=1.1.1&LAYERS=BlueMarble_ShadedRelief_Bathymetry,MODIS_Aqua_L3_Land_Surface_Temp_Monthly_CMG_Night_TES&STYLES=&SRS=EPSG:4326&BBOX=-160,-90,160,90&WIDTH=640&HEIGHT=360&FORMAT=image/jpeg&TIME=2023-07-01"
+        type: image/jpeg
+        title: "NASA GIBS: BlueMarble_ShadedRelief_Bathymetry, MODIS_Aqua_L3_Land_Surface_Temp_Monthly_CMG_Night_TES, 2023-07-01"
+      description: |
+        Gridded land surface temperature records from low-Earth-orbit and
+        geostationary satellites.
+
+  - id: field-campaigns
+    title: Field campaigns
+    preview:
+      href: "https://gibs.earthdata.nasa.gov/wms/epsg4326/best/wms.cgi?SERVICE=WMS&REQUEST=GetMap&VERSION=1.1.1&LAYERS=BlueMarble_ShadedRelief_Bathymetry,IMERG_Precipitation_Rate&STYLES=&SRS=EPSG:4326&BBOX=-115,-1.1431,-35,41.1431&WIDTH=640&HEIGHT=360&FORMAT=image/jpeg&TIME=2005-08-29"
+      type: image/jpeg
+      title: "NASA GIBS: BlueMarble_ShadedRelief_Bathymetry, IMERG_Precipitation_Rate, 2005-08-29"
+    description: |
+      Airborne and ground-based measurements from NASA field campaigns, archived
+      at the Global Hydrometeorology Resource Center (GHRC DAAC): radars,
+      radiometers, lidars, dropsondes, disdrometers, lightning sensors and
+      aircraft navigation data.
+    children:
+    - id: gpm-ground-validation
+      title: GPM ground validation
+      preview:
+        href: "https://gibs.earthdata.nasa.gov/wms/epsg4326/best/wms.cgi?SERVICE=WMS&REQUEST=GetMap&VERSION=1.1.1&LAYERS=BlueMarble_ShadedRelief_Bathymetry,IMERG_Precipitation_Rate&STYLES=&SRS=EPSG:4326&BBOX=-115,25.5333,-69,46.4667&WIDTH=640&HEIGHT=360&FORMAT=image/jpeg&TIME=2019-05-28"
+        type: image/jpeg
+        title: "NASA GIBS: BlueMarble_ShadedRelief_Bathymetry, IMERG_Precipitation_Rate, 2019-05-28"
+      description: |
+        Campaigns that validate the Global Precipitation Measurement mission's
+        rain and snow retrievals with ground radars, disdrometers, gauges and
+        instrumented aircraft.
+      children:
+      - id: campaign-iphex
+        title: IPHEx
+        preview:
+          href: "https://gibs.earthdata.nasa.gov/wms/epsg4326/best/wms.cgi?SERVICE=WMS&REQUEST=GetMap&VERSION=1.1.1&LAYERS=MODIS_Aqua_CorrectedReflectance_TrueColor&STYLES=&SRS=EPSG:4326&BBOX=-85.5,34.1262,-79.5,36.8738&WIDTH=640&HEIGHT=360&FORMAT=image/jpeg&TIME=2014-06-14"
+          type: image/jpeg
+          title: "NASA GIBS: MODIS_Aqua_CorrectedReflectance_TrueColor, 2014-06-14"
+        description: |
+          Integrated Precipitation and Hydrology Experiment, May–June 2014,
+          southern Appalachian Mountains, North Carolina: orographic rainfall
+          and flood hydrology.
+      - id: campaign-gcpex
+        title: GCPEx
+        preview:
+          href: "https://gibs.earthdata.nasa.gov/wms/epsg4326/best/wms.cgi?SERVICE=WMS&REQUEST=GetMap&VERSION=1.1.1&LAYERS=MODIS_Terra_CorrectedReflectance_TrueColor&STYLES=&SRS=EPSG:4326&BBOX=-87,41.5722,-75,46.4278&WIDTH=640&HEIGHT=360&FORMAT=image/jpeg&TIME=2012-02-13"
+          type: image/jpeg
+          title: "NASA GIBS: MODIS_Terra_CorrectedReflectance_TrueColor, 2012-02-13"
+        description: |
+          GPM Cold-season Precipitation Experiment, January–February 2012,
+          southern Ontario, Canada: falling snow.
+      - id: campaign-olympex
+        title: OLYMPEX
+        preview:
+          href: "https://gibs.earthdata.nasa.gov/wms/epsg4326/best/wms.cgi?SERVICE=WMS&REQUEST=GetMap&VERSION=1.1.1&LAYERS=MODIS_Terra_CorrectedReflectance_TrueColor&STYLES=&SRS=EPSG:4326&BBOX=-125.5,47.0443,-121.5,48.5557&WIDTH=640&HEIGHT=360&FORMAT=image/jpeg&TIME=2015-12-30"
+          type: image/jpeg
+          title: "NASA GIBS: MODIS_Terra_CorrectedReflectance_TrueColor, 2015-12-30"
+        description: |
+          Olympic Mountains Experiment, November 2015 – February 2016,
+          Washington State: Pacific frontal systems crossing coastal mountains.
+      - id: campaign-mc3e
+        title: MC3E
+        preview:
+          href: "https://gibs.earthdata.nasa.gov/wms/epsg4326/best/wms.cgi?SERVICE=WMS&REQUEST=GetMap&VERSION=1.1.1&LAYERS=MODIS_Aqua_CorrectedReflectance_TrueColor&STYLES=&SRS=EPSG:4326&BBOX=-102.5,34.2392,-92.5,38.7608&WIDTH=640&HEIGHT=360&FORMAT=image/jpeg&TIME=2011-05-24"
+          type: image/jpeg
+          title: "NASA GIBS: MODIS_Aqua_CorrectedReflectance_TrueColor, 2011-05-24"
+        description: |
+          Midlatitude Continental Convective Clouds Experiment, April–June 2011,
+          Oklahoma: deep continental convection.
+      - id: campaign-ifloods
+        title: IFloodS
+        preview:
+          href: "https://gibs.earthdata.nasa.gov/wms/epsg4326/best/wms.cgi?SERVICE=WMS&REQUEST=GetMap&VERSION=1.1.1&LAYERS=MODIS_Terra_CorrectedReflectance_Bands721&STYLES=&SRS=EPSG:4326&BBOX=-96.5,40.5369,-89.5,43.4631&WIDTH=640&HEIGHT=360&FORMAT=image/jpeg&TIME=2013-06-03"
+          type: image/jpeg
+          title: "NASA GIBS: MODIS_Terra_CorrectedReflectance_Bands721, 2013-06-03"
+        description: |
+          Iowa Flood Studies, May–June 2013: rainfall estimates for flood
+          forecasting.
+      - id: campaign-lpvex
+        title: LPVEx
+        preview:
+          href: "https://gibs.earthdata.nasa.gov/wms/epsg4326/best/wms.cgi?SERVICE=WMS&REQUEST=GetMap&VERSION=1.1.1&LAYERS=MODIS_Terra_CorrectedReflectance_TrueColor&STYLES=&SRS=EPSG:4326&BBOX=21,58.875,29,61.125&WIDTH=640&HEIGHT=360&FORMAT=image/jpeg&TIME=2010-10-02"
+          type: image/jpeg
+          title: "NASA GIBS: MODIS_Terra_CorrectedReflectance_TrueColor, 2010-10-02"
+        description: |
+          Light Precipitation Validation Experiment, September–October 2010,
+          Gulf of Finland: light rain at high latitudes.
+      - id: campaign-hymex
+        title: HyMeX
+        preview:
+          href: "https://gibs.earthdata.nasa.gov/wms/epsg4326/best/wms.cgi?SERVICE=WMS&REQUEST=GetMap&VERSION=1.1.1&LAYERS=MODIS_Terra_CorrectedReflectance_TrueColor&STYLES=&SRS=EPSG:4326&BBOX=-3,37.6038,13,44.3962&WIDTH=640&HEIGHT=360&FORMAT=image/jpeg&TIME=2012-09-05"
+          type: image/jpeg
+          title: "NASA GIBS: MODIS_Terra_CorrectedReflectance_TrueColor, 2012-09-05"
+        description: |
+          Hydrological cycle in the Mediterranean Experiment, autumn 2012:
+          heavy precipitation in the western Mediterranean.
+      - id: campaign-gpm-gv-other
+        title: Other GPM ground validation
+        preview:
+          href: "https://gibs.earthdata.nasa.gov/wms/epsg4326/best/wms.cgi?SERVICE=WMS&REQUEST=GetMap&VERSION=1.1.1&LAYERS=MODIS_Aqua_CorrectedReflectance_TrueColor&STYLES=&SRS=EPSG:4326&BBOX=-77.8,37.1135,-73.8,38.8865&WIDTH=640&HEIGHT=360&FORMAT=image/jpeg&TIME=2015-11-03"
+          type: image/jpeg
+          title: "NASA GIBS: MODIS_Aqua_CorrectedReflectance_TrueColor, 2015-11-03"
+        description: |
+          Ground validation data from other campaigns and sites, such as
+          ICE-POP (Korea, 2018), C3VP, TWP-ICE, Wallops Flight Facility, UConn,
+          NSSTC Huntsville and EPFL Lausanne, plus the Validation Network and
+          the MRMS precipitation reanalysis.
+    - id: hurricane-campaigns
+      title: Hurricanes & tropical convection
+      preview:
+        href: "https://gibs.earthdata.nasa.gov/wms/epsg4326/best/wms.cgi?SERVICE=WMS&REQUEST=GetMap&VERSION=1.1.1&LAYERS=VIIRS_SNPP_CorrectedReflectance_TrueColor&STYLES=&SRS=EPSG:4326&BBOX=-90,11.5692,-50,32.4308&WIDTH=640&HEIGHT=360&FORMAT=image/jpeg&TIME=2017-09-08"
+        type: image/jpeg
+        title: "NASA GIBS: VIIRS_SNPP_CorrectedReflectance_TrueColor, 2017-09-08"
+      description: |
+        Airborne campaigns into tropical cyclones and tropical convection, from
+        genesis off West Africa to landfall.
+      children:
+      - id: campaign-camex
+        title: CAMEX
+        preview:
+          href: "https://gibs.earthdata.nasa.gov/wms/epsg4326/best/wms.cgi?SERVICE=WMS&REQUEST=GetMap&VERSION=1.1.1&LAYERS=MODIS_Terra_CorrectedReflectance_TrueColor&STYLES=&SRS=EPSG:4326&BBOX=-68.5,28.6608,-54.5,35.3392&WIDTH=640&HEIGHT=360&FORMAT=image/jpeg&TIME=2001-09-09"
+          type: image/jpeg
+          title: "NASA GIBS: MODIS_Terra_CorrectedReflectance_TrueColor, 2001-09-09"
+        description: |
+          Convection And Moisture EXperiment, four campaigns between 1993 and
+          2001: hurricane structure and moisture over the Atlantic.
+      - id: campaign-cpex
+        title: CPEX
+        preview:
+          href: "https://gibs.earthdata.nasa.gov/wms/epsg4326/best/wms.cgi?SERVICE=WMS&REQUEST=GetMap&VERSION=1.1.1&LAYERS=VIIRS_NOAA20_CorrectedReflectance_TrueColor&STYLES=&SRS=EPSG:4326&BBOX=-62,15.7486,-42,26.2514&WIDTH=640&HEIGHT=360&FORMAT=image/jpeg&TIME=2021-09-06"
+          type: image/jpeg
+          title: "NASA GIBS: VIIRS_NOAA20_CorrectedReflectance_TrueColor, 2021-09-06"
+        description: |
+          Convective Processes Experiment: 2017 over the Gulf of Mexico and
+          Caribbean, CPEX-AW (2021) and CPEX-CV (2022, Cabo Verde).
+      - id: campaign-grip
+        title: GRIP
+        preview:
+          href: "https://gibs.earthdata.nasa.gov/wms/epsg4326/best/wms.cgi?SERVICE=WMS&REQUEST=GetMap&VERSION=1.1.1&LAYERS=MODIS_Aqua_CorrectedReflectance_TrueColor&STYLES=&SRS=EPSG:4326&BBOX=-78,21.9554,-62,30.0446&WIDTH=640&HEIGHT=360&FORMAT=image/jpeg&TIME=2010-09-01"
+          type: image/jpeg
+          title: "NASA GIBS: MODIS_Aqua_CorrectedReflectance_TrueColor, 2010-09-01"
+        description: |
+          Genesis and Rapid Intensification Processes, August–September 2010:
+          how hurricanes form and intensify.
+      - id: campaign-namma
+        title: NAMMA
+        preview:
+          href: "https://gibs.earthdata.nasa.gov/wms/epsg4326/best/wms.cgi?SERVICE=WMS&REQUEST=GetMap&VERSION=1.1.1&LAYERS=MODIS_Terra_CorrectedReflectance_TrueColor&STYLES=&SRS=EPSG:4326&BBOX=-34,9.5667,-14,20.4333&WIDTH=640&HEIGHT=360&FORMAT=image/jpeg&TIME=2006-08-22"
+          type: image/jpeg
+          title: "NASA GIBS: MODIS_Terra_CorrectedReflectance_TrueColor, 2006-08-22"
+        description: |
+          NASA African Monsoon Multidisciplinary Analyses, August–September
+          2006, Cabo Verde: African easterly waves and hurricane genesis.
+      - id: campaign-tcsp
+        title: TCSP
+        preview:
+          href: "https://gibs.earthdata.nasa.gov/wms/epsg4326/best/wms.cgi?SERVICE=WMS&REQUEST=GetMap&VERSION=1.1.1&LAYERS=MODIS_Aqua_CorrectedReflectance_TrueColor&STYLES=&SRS=EPSG:4326&BBOX=-86,13.0306,-72,20.5694&WIDTH=640&HEIGHT=360&FORMAT=image/jpeg&TIME=2005-07-16"
+          type: image/jpeg
+          title: "NASA GIBS: MODIS_Aqua_CorrectedReflectance_TrueColor, 2005-07-16"
+        description: |
+          Tropical Cloud Systems and Processes, July 2005, Costa Rica.
+      - id: campaign-hs3
+        title: HS3
+        preview:
+          href: "https://gibs.earthdata.nasa.gov/wms/epsg4326/best/wms.cgi?SERVICE=WMS&REQUEST=GetMap&VERSION=1.1.1&LAYERS=MODIS_Terra_CorrectedReflectance_TrueColor&STYLES=&SRS=EPSG:4326&BBOX=-63.5,28.1427,-49.5,34.8573&WIDTH=640&HEIGHT=360&FORMAT=image/jpeg&TIME=2014-09-16"
+          type: image/jpeg
+          title: "NASA GIBS: MODIS_Terra_CorrectedReflectance_TrueColor, 2014-09-16"
+        description: |
+          Hurricane and Severe Storm Sentinel, 2012–2014: long-endurance Global
+          Hawk flights over Atlantic hurricanes.
+      - id: campaign-tc4
+        title: TC4
+        preview:
+          href: "https://gibs.earthdata.nasa.gov/wms/epsg4326/best/wms.cgi?SERVICE=WMS&REQUEST=GetMap&VERSION=1.1.1&LAYERS=MODIS_Terra_CorrectedReflectance_TrueColor&STYLES=&SRS=EPSG:4326&BBOX=-89,7.0035,-80,11.9965&WIDTH=640&HEIGHT=360&FORMAT=image/jpeg&TIME=2007-07-23"
+          type: image/jpeg
+          title: "NASA GIBS: MODIS_Terra_CorrectedReflectance_TrueColor, 2007-07-23"
+        description: |
+          Tropical Composition, Cloud and Climate Coupling, July–August 2007,
+          Costa Rica.
+      - id: campaign-epoch
+        title: EPOCH
+        preview:
+          href: "https://gibs.earthdata.nasa.gov/wms/epsg4326/best/wms.cgi?SERVICE=WMS&REQUEST=GetMap&VERSION=1.1.1&LAYERS=VIIRS_SNPP_CorrectedReflectance_TrueColor&STYLES=&SRS=EPSG:4326&BBOX=-125,7.9367,-99,22.0633&WIDTH=640&HEIGHT=360&FORMAT=image/jpeg&TIME=2017-07-25"
+          type: image/jpeg
+          title: "NASA GIBS: VIIRS_SNPP_CorrectedReflectance_TrueColor, 2017-07-25"
+        description: |
+          East Pacific Origins and Characteristics of Hurricanes, 2017: ER-2
+          radar and Global Hawk flights over eastern Pacific tropical cyclones.
+    - id: campaign-other
+      title: Other campaigns
+      preview:
+        href: "https://gibs.earthdata.nasa.gov/wms/epsg4326/best/wms.cgi?SERVICE=WMS&REQUEST=GetMap&VERSION=1.1.1&LAYERS=MODIS_Aqua_CorrectedReflectance_TrueColor&STYLES=&SRS=EPSG:4326&BBOX=-85.5,24.4864,-77.5,28.5136&WIDTH=640&HEIGHT=360&FORMAT=image/jpeg&TIME=2002-07-29"
+        type: image/jpeg
+        title: "NASA GIBS: MODIS_Aqua_CorrectedReflectance_TrueColor, 2002-07-29"
+      description: |
+        Smaller campaigns and single datasets, such as CRYSTAL-FACE, KWAJEX,
+        TRMM-LBA, TOGA COARE, CaPE, FIRE III ACE and HIRAD.
+    - id: campaign-impacts
+      title: IMPACTS
+      preview:
+        href: "https://gibs.earthdata.nasa.gov/wms/epsg4326/best/wms.cgi?SERVICE=WMS&REQUEST=GetMap&VERSION=1.1.1&LAYERS=VIIRS_SNPP_CorrectedReflectance_TrueColor&STYLES=&SRS=EPSG:4326&BBOX=-82,34.8292,-58,45.1708&WIDTH=640&HEIGHT=360&FORMAT=image/jpeg&TIME=2022-01-30"
+        type: image/jpeg
+        title: "NASA GIBS: VIIRS_SNPP_CorrectedReflectance_TrueColor, 2022-01-30"
+      description: |
+        Investigation of Microphysics and Precipitation for Atlantic
+        Coast-Threatening Snowstorms, winters 2020, 2022 and 2023: snow bands in
+        US East Coast winter storms, sampled from above and within.
+    - id: campaign-lightning
+      title: Lightning campaigns
+      preview:
+        href: "https://gibs.earthdata.nasa.gov/wms/epsg4326/best/wms.cgi?SERVICE=WMS&REQUEST=GetMap&VERSION=1.1.1&LAYERS=VIIRS_NOAA20_CorrectedReflectance_TrueColor&STYLES=&SRS=EPSG:4326&BBOX=-72,-35.3394,-54,-26.6606&WIDTH=640&HEIGHT=360&FORMAT=image/jpeg&TIME=2018-11-23"
+        type: image/jpeg
+        title: "NASA GIBS: VIIRS_NOAA20_CorrectedReflectance_TrueColor, 2018-11-23"
+      description: |
+        Lightning and storm electrification campaigns, including the GOES-R
+        Post-Launch Test campaign that validated the Geostationary Lightning
+        Mapper (2017), ALOFT, ACES and RELAMPAGO.
+    - id: campaign-whymsie
+      title: WHyMSIE
+      preview:
+        href: "https://gibs.earthdata.nasa.gov/wms/epsg4326/best/wms.cgi?SERVICE=WMS&REQUEST=GetMap&VERSION=1.1.1&LAYERS=BlueMarble_NextGeneration,AMSRU_L3_Total_Precipitable_Water_Monthly&STYLES=&SRS=EPSG:4326&BBOX=-120,-3.0389,-10,53.0389&WIDTH=640&HEIGHT=360&FORMAT=image/jpeg&TIME=2024-09-01"
+        type: image/jpeg
+        title: "NASA GIBS: BlueMarble_NextGeneration, AMSRU_L3_Total_Precipitable_Water_Monthly, 2024-09-01"
+      description: |
+        Airborne campaign with microwave sounders, water vapour lidar, cloud
+        radar, dropsondes and radiosondes, profiling water vapour, clouds and
+        precipitation.
+
+  - id: atmosphere
+    title: Atmosphere & climate records
+    preview:
+      href: "https://gibs.earthdata.nasa.gov/wms/epsg4326/best/wms.cgi?SERVICE=WMS&REQUEST=GetMap&VERSION=1.1.1&LAYERS=CERES_EBAF_TOA_Longwave_Flux_All_Sky_Monthly&STYLES=&SRS=EPSG:4326&BBOX=-160,-90,160,90&WIDTH=640&HEIGHT=360&FORMAT=image/jpeg&TIME=2016-07-01"
+      type: image/jpeg
+      title: "NASA GIBS: CERES_EBAF_TOA_Longwave_Flux_All_Sky_Monthly, 2016-07-01"
+    description: |
+      Satellite records of the atmosphere and the air-sea interface, from
+      decades-long passive microwave series to new polar CubeSats.
+    children:
+    - id: passive-microwave
+      title: Passive microwave records
+      preview:
+        href: "https://gibs.earthdata.nasa.gov/wms/epsg3413/best/wms.cgi?SERVICE=WMS&REQUEST=GetMap&VERSION=1.1.1&LAYERS=AMSRU2_Sea_Ice_Brightness_Temp_6km_89H&STYLES=&SRS=EPSG:3413&BBOX=-4000000,-2250000,4000000,2250000&WIDTH=640&HEIGHT=360&FORMAT=image/jpeg&TIME=2024-03-15"
+        type: image/jpeg
+        title: "NASA GIBS: AMSRU2_Sea_Ice_Brightness_Temp_6km_89H, 2024-03-15"
+      description: |
+        Ocean products from SSM/I, SSMIS and TMI (wind speed, water vapour,
+        cloud liquid water, rain), AMSU-A swaths and AMSU/MSU temperature
+        anomalies from the lower troposphere to the lower stratosphere,
+        enhanced-resolution brightness temperatures, and climatologies built on
+        them, such as SeaFlux, hail and tropical cyclone precipitation features.
+    - id: prefire
+      title: PREFIRE
+      preview:
+        href: "https://gibs.earthdata.nasa.gov/wms/epsg3413/best/wms.cgi?SERVICE=WMS&REQUEST=GetMap&VERSION=1.1.1&LAYERS=MODIS_Terra_CorrectedReflectance_TrueColor&STYLES=&SRS=EPSG:3413&BBOX=-4000000,-2250000,4000000,2250000&WIDTH=640&HEIGHT=360&FORMAT=image/jpeg&TIME=2024-07-20"
+        type: image/jpeg
+        title: "NASA GIBS: MODIS_Terra_CorrectedReflectance_TrueColor, 2024-07-20"
+      description: |
+        Polar Radiant Energy in the Far-InfraRed Experiment: two CubeSats
+        (launched 2024) measuring far-infrared spectra over the poles, with
+        spectral flux, surface emissivity, cloud and atmospheric property
+        products for each satellite.
+    - id: sage-iii
+      title: SAGE III/ISS
+      preview:
+        href: "https://gibs.earthdata.nasa.gov/wms/epsg4326/best/wms.cgi?SERVICE=WMS&REQUEST=GetMap&VERSION=1.1.1&LAYERS=MERRA2_Ozone_Mixing_Ratio_50hPa_Monthly&STYLES=&SRS=EPSG:4326&BBOX=-160,-90,160,90&WIDTH=640&HEIGHT=360&FORMAT=image/jpeg&TIME=2023-10-01"
+        type: image/jpeg
+        title: "NASA GIBS: MERRA2_Ozone_Mixing_Ratio_50hPa_Monthly, 2023-10-01"
+      description: |
+        Stratospheric Aerosol and Gas Experiment III on the International Space
+        Station: solar occultation profiles of ozone, aerosol and other trace
+        species.
+    - id: nldas
+      title: NLDAS
+      preview:
+        href: "https://gibs.earthdata.nasa.gov/wms/epsg4326/best/wms.cgi?SERVICE=WMS&REQUEST=GetMap&VERSION=1.1.1&LAYERS=BlueMarble_ShadedRelief_Bathymetry,NLDAS_Near_Surface_Air_Temperature_Primary_Monthly&STYLES=&SRS=EPSG:4326&BBOX=-127,24.8533,-65,52.1467&WIDTH=640&HEIGHT=360&FORMAT=image/jpeg&TIME=2023-07-01"
+        type: image/jpeg
+        title: "NASA GIBS: BlueMarble_ShadedRelief_Bathymetry, NLDAS_Near_Surface_Air_Temperature_Primary_Monthly, 2023-07-01"
+      description: |
+        North American Land Data Assimilation System forcing data at 0.125°.
+    - id: atmosphere-regional
+      title: Regional studies
+      preview:
+        href: "https://gibs.earthdata.nasa.gov/wms/epsg4326/best/wms.cgi?SERVICE=WMS&REQUEST=GetMap&VERSION=1.1.1&LAYERS=MODIS_Aqua_CorrectedReflectance_TrueColor&STYLES=&SRS=EPSG:4326&BBOX=-92,28.3189,-88,30.2811&WIDTH=640&HEIGHT=360&FORMAT=image/jpeg&TIME=2019-04-20"
+        type: image/jpeg
+        title: "NASA GIBS: MODIS_Aqua_CorrectedReflectance_TrueColor, 2019-04-20"
+      description: |
+        Regional climatologies and decision-support datasets: Central American
+        gap winds and upwelling (RASI), Gulf of Mexico sediment (SANDS),
+        high-impact weather in South Asia (HIWAT), NASA SPoRT's Land
+        Information System and a global geostationary infrared composite.
+
+  - id: lightning
+    title: Lightning
+    preview:
+      href: "https://gibs.earthdata.nasa.gov/wms/epsg4326/best/wms.cgi?SERVICE=WMS&REQUEST=GetMap&VERSION=1.1.1&LAYERS=BlueMarble_ShadedRelief_Bathymetry,LIS_High_Resolution_Full_Climatology_Combined_Flash_Rate_Climatology&STYLES=&SRS=EPSG:4326&BBOX=-160,-90,160,90&WIDTH=640&HEIGHT=360&FORMAT=image/jpeg&TIME=1995-05-04"
+      type: image/jpeg
+      title: "NASA GIBS: BlueMarble_ShadedRelief_Bathymetry, LIS_High_Resolution_Full_Climatology_Combined_Flash_Rate_Climatology, 1995-05-04"
+    description: |
+      Lightning observations from space and from ground networks, as events,
+      flashes, gridded products and thunder-hour climatologies.
+    children:
+    - id: lightning-space
+      title: Space-borne lightning (LIS, OTD, OLS)
+      preview:
+        href: "https://gibs.earthdata.nasa.gov/wms/epsg4326/best/wms.cgi?SERVICE=WMS&REQUEST=GetMap&VERSION=1.1.1&LAYERS=BlueMarble_ShadedRelief_Bathymetry,LIS_Very_High_Resolution_Lightning_Full_Climatology_LIS_Mean_Flash_Rate&STYLES=&SRS=EPSG:4326&BBOX=-10,-16.875,50,16.875&WIDTH=640&HEIGHT=360&FORMAT=image/jpeg&TIME=1998-01-01"
+        type: image/jpeg
+        title: "NASA GIBS: BlueMarble_ShadedRelief_Bathymetry, LIS_Very_High_Resolution_Lightning_Full_Climatology_LIS_Mean_Flash_Rate, 1998-01-01"
+      description: |
+        Optical lightning detection from low Earth orbit: the Lightning Imaging
+        Sensor on TRMM and the ISS, the Optical Transient Detector, and
+        lightning derived from DMSP OLS imagery.
+    - id: lightning-glm
+      title: GOES Geostationary Lightning Mapper
+      preview:
+        href: "https://gibs.earthdata.nasa.gov/wms/epsg4326/best/wms.cgi?SERVICE=WMS&REQUEST=GetMap&VERSION=1.1.1&LAYERS=LIS_Very_High_Resolution_Lightning_Monthly_Climatology_LIS_Mean_Flash_Rate&STYLES=&SRS=EPSG:4326&BBOX=-120,9.7061,-60,40.2939&WIDTH=640&HEIGHT=360&FORMAT=image/jpeg&TIME=2013-07-01"
+        type: image/jpeg
+        title: "NASA GIBS: LIS_Very_High_Resolution_Lightning_Monthly_Climatology_LIS_Mean_Flash_Rate, 2013-07-01"
+      description: |
+        Continuous lightning mapping over the Americas from the GOES-R series:
+        events and flashes, gridded products and thunder-hour climatologies.
+    - id: lightning-ground-networks
+      title: Ground lightning networks
+      preview:
+        href: "https://gibs.earthdata.nasa.gov/wms/epsg4326/best/wms.cgi?SERVICE=WMS&REQUEST=GetMap&VERSION=1.1.1&LAYERS=BlueMarble_ShadedRelief_Bathymetry,LIS_High_Resolution_Full_Climatology_LIS_Flash_Rate_Climatology&STYLES=&SRS=EPSG:4326&BBOX=-115,-9.3884,-45,29.3884&WIDTH=640&HEIGHT=360&FORMAT=image/jpeg&TIME=1995-05-04"
+        type: image/jpeg
+        title: "NASA GIBS: BlueMarble_ShadedRelief_Bathymetry, LIS_High_Resolution_Full_Climatology_LIS_Flash_Rate_Climatology, 1995-05-04"
+      description: |
+        Lightning Mapping Arrays, LDAR, field mills and the World Wide Lightning
+        Location Network.
+
+  - id: ocean-surface-water
+    title: Ocean & surface water
+    preview:
+      href: "https://gibs.earthdata.nasa.gov/wms/epsg4326/best/wms.cgi?SERVICE=WMS&REQUEST=GetMap&VERSION=1.1.1&LAYERS=BlueMarble_NextGeneration,GHRSST_L4_MUR_Sea_Surface_Temperature&STYLES=&SRS=EPSG:4326&BBOX=-160,-90,160,90&WIDTH=640&HEIGHT=360&FORMAT=image/jpeg&TIME=2023-08-15"
+      type: image/jpeg
+      title: "NASA GIBS: BlueMarble_NextGeneration, GHRSST_L4_MUR_Sea_Surface_Temperature, 2023-08-15"
+    description: |
+      Sea surface temperature and salinity, ocean simulations, and surface water
+      from SWOT and OPERA.
+    children:
+    - id: swot
+      title: SWOT
+      preview:
+        href: "https://gibs.earthdata.nasa.gov/wms/epsg4326/best/wms.cgi?SERVICE=WMS&REQUEST=GetMap&VERSION=1.1.1&LAYERS=MODIS_Aqua_CorrectedReflectance_TrueColor&STYLES=&SRS=EPSG:4326&BBOX=-62,-4.6041,-57,-1.7959&WIDTH=640&HEIGHT=360&FORMAT=image/jpeg&TIME=2022-08-06"
+        type: image/jpeg
+        title: "NASA GIBS: MODIS_Aqua_CorrectedReflectance_TrueColor, 2022-08-06"
+      description: |
+        Surface Water and Ocean Topography (CNES/NASA, launched December 2022):
+        Ka-band interferometric measurements of rivers, lakes and the ocean.
+        Level 1B and Level 2 products in processing versions C and D, plus
+        pre-launch simulated North America products.
+    - id: ghrsst
+      title: Sea surface temperature (GHRSST)
+      preview:
+        href: "https://gibs.earthdata.nasa.gov/wms/epsg4326/best/wms.cgi?SERVICE=WMS&REQUEST=GetMap&VERSION=1.1.1&LAYERS=GHRSST_L4_MUR_Sea_Surface_Temperature&STYLES=&SRS=EPSG:4326&BBOX=-77,32.6809,-53,43.3191&WIDTH=640&HEIGHT=360&FORMAT=image/jpeg&TIME=2023-04-15"
+        type: image/jpeg
+        title: "NASA GIBS: GHRSST_L4_MUR_Sea_Surface_Temperature, 2023-04-15"
+      description: |
+        GHRSST Level 2P sea surface temperature from VIIRS and MODIS.
+    - id: smap-salinity
+      title: Sea surface salinity (SMAP)
+      preview:
+        href: "https://gibs.earthdata.nasa.gov/wms/epsg4326/best/wms.cgi?SERVICE=WMS&REQUEST=GetMap&VERSION=1.1.1&LAYERS=BlueMarble_NextGeneration,SMAP_L3_Sea_Surface_Salinity_CAP_Monthly&STYLES=&SRS=EPSG:4326&BBOX=-160,-90,160,90&WIDTH=640&HEIGHT=360&FORMAT=image/jpeg&TIME=2023-08-01"
+        type: image/jpeg
+        title: "NASA GIBS: BlueMarble_NextGeneration, SMAP_L3_Sea_Surface_Salinity_CAP_Monthly, 2023-08-01"
+      description: |
+        Remote Sensing Systems SMAP Level 3 sea surface salinity, 8-day running
+        mean.
+    - id: opera-dswx
+      title: OPERA surface water extent
+      preview:
+        href: "https://gibs.earthdata.nasa.gov/wms/epsg4326/best/wms.cgi?SERVICE=WMS&REQUEST=GetMap&VERSION=1.1.1&LAYERS=OPERA_L3_Dynamic_Surface_Water_Extent-HLS&STYLES=&SRS=EPSG:4326&BBOX=88.95,21.7413,89.75,22.1587&WIDTH=640&HEIGHT=360&FORMAT=image/jpeg&TIME=2024-02-10"
+        type: image/jpeg
+        title: "NASA GIBS: OPERA_L3_Dynamic_Surface_Water_Extent-HLS, 2024-02-10"
+      description: |
+        OPERA Dynamic Surface Water Extent from Harmonized Landsat Sentinel-2
+        and from Sentinel-1.
+    - id: pre-swot-models
+      title: Pre-SWOT ocean simulations
+      preview:
+        href: "https://gibs.earthdata.nasa.gov/wms/epsg4326/best/wms.cgi?SERVICE=WMS&REQUEST=GetMap&VERSION=1.1.1&LAYERS=GHRSST_L4_MUR_Sea_Surface_Temperature&STYLES=&SRS=EPSG:4326&BBOX=133,-57.1946,163,-46.8054&WIDTH=640&HEIGHT=360&FORMAT=image/jpeg&TIME=2023-03-15"
+        type: image/jpeg
+        title: "NASA GIBS: GHRSST_L4_MUR_Sea_Surface_Temperature, 2023-03-15"
+      description: |
+        Hourly ~2 km MITgcm LLC4320 ocean model output for the New Caledonia and
+        Southern Ocean regions, prepared for SWOT.
+
+  - id: sar
+    title: Synthetic aperture radar
+    preview:
+      href: "https://gibs.earthdata.nasa.gov/wms/epsg4326/best/wms.cgi?SERVICE=WMS&REQUEST=GetMap&VERSION=1.1.1&LAYERS=OPERA_L2_Radiometric_Terrain_Corrected_SAR_Sentinel-1&STYLES=&SRS=EPSG:4326&BBOX=-122.9,37.3942,-121.3,38.1058&WIDTH=640&HEIGHT=360&FORMAT=image/jpeg&TIME=2025-08-05"
+      type: image/jpeg
+      title: "NASA GIBS: OPERA_L2_Radiometric_Terrain_Corrected_SAR_Sentinel-1, 2025-08-05"
+    description: |
+      Radar imaging that sees through clouds and works day and night.
+    children:
+    - id: nisar
+      title: NISAR
+      preview:
+        href: "https://gibs.earthdata.nasa.gov/wms/epsg4326/best/wms.cgi?SERVICE=WMS&REQUEST=GetMap&VERSION=1.1.1&LAYERS=NISAR_L2_Geocoded_Polarimetric_Covariance&STYLES=&SRS=EPSG:4326&BBOX=-91.15,29.5601,-89.55,30.3399&WIDTH=640&HEIGHT=360&FORMAT=image/jpeg&TIME=2026-09-01"
+        type: image/jpeg
+        title: "NASA GIBS: NISAR_L2_Geocoded_Polarimetric_Covariance, 2026-09-01"
+      description: |
+        NASA-ISRO SAR mission (launched 2025): beta and provisional L-band
+        products: single-look complex, interferograms, pixel offsets,
+        polarimetric covariance, soil moisture and raw signal data.
+    - id: opera-sentinel-1
+      title: OPERA Sentinel-1
+      preview:
+        href: "https://gibs.earthdata.nasa.gov/wms/epsg4326/best/wms.cgi?SERVICE=WMS&REQUEST=GetMap&VERSION=1.1.1&LAYERS=OPERA_L2_Radiometric_Terrain_Corrected_SAR_Sentinel-1&STYLES=&SRS=EPSG:4326&BBOX=-122.36,46.6192,-121.16,47.0808&WIDTH=640&HEIGHT=360&FORMAT=image/jpeg&TIME=2025-08-12"
+        type: image/jpeg
+        title: "NASA GIBS: OPERA_L2_Radiometric_Terrain_Corrected_SAR_Sentinel-1, 2025-08-12"
+      description: |
+        OPERA products from Sentinel-1: radiometric terrain-corrected
+        backscatter, coregistered single-look complex, their static layers, and
+        tropospheric zenith delay.
+
+  - id: aerial-imagery
+    title: Aerial imagery
+    preview:
+      href: "https://gibs.earthdata.nasa.gov/wms/epsg4326/best/wms.cgi?SERVICE=WMS&REQUEST=GetMap&VERSION=1.1.1&LAYERS=HLS_S30_Nadir_BRDF_Adjusted_Reflectance&STYLES=&SRS=EPSG:4326&BBOX=-86.925,36.1005,-86.575,36.2595&WIDTH=640&HEIGHT=360&FORMAT=image/jpeg&TIME=2020-04-17"
+      type: image/jpeg
+      title: "NASA GIBS: HLS_S30_Nadir_BRDF_Adjusted_Reflectance, 2020-04-17"
+    description: |
+      High-resolution aerial photography: NOAA emergency response imagery
+      collected after natural disasters, here after the March 2020 Nashville
+      tornado.
