@@ -9,11 +9,14 @@ import asyncio
 import dataclasses
 import json
 import os
+import re
 import time
 from typing import Any
 from urllib.error import HTTPError
 from urllib.parse import quote, urlencode
 from urllib.request import Request, urlopen
+
+from fastapi import HTTPException
 
 ADMIN_GROUP = "/eoapi-admin"
 # auth:groups value that grants everyone, authenticated or not.
@@ -22,6 +25,13 @@ GROUPS = {"/eoapi-noaa": "noaa", "/nasa-users": "nasa", "/dyamond-users": "dyamo
 CACHE_TTL = 60
 PAGE = 1000
 UPSTREAM = os.environ.get("UPSTREAM_URL", "").rstrip("/")
+# Catalogs extension paths naming one collection, alone or through its items.
+# The server ignores `filter` on these, so the filters below refuse an
+# unreadable collection themselves instead of filtering it.
+CATALOG_COLLECTION = re.compile(
+    r"^/catalogs/[^/]+/collections/(?P<collection_id>[^/]+)(?:/items(?:/[^/]+)?)?/?$",
+    re.IGNORECASE,
+)
 
 # Upstream responses by path. Not keyed by caller: a collection's auth:groups
 # belongs to the collection, so every caller shares one entry.
@@ -84,13 +94,37 @@ def _readable_collection_ids(values: list[str]) -> list[str]:
             return ids
 
 
+async def _collection_readable(collection_id: str, values: list[str]) -> bool:
+    """Whether the collection shares an auth:groups value with `values`."""
+    collection = await asyncio.to_thread(
+        _get, f"/collections/{quote(collection_id, safe='')}"
+    )
+    return bool(set(collection.get("auth:groups") or []).intersection(values))
+
+
+async def _catalog_collection_id(
+    context: dict[str, Any], values: list[str]
+) -> str | None:
+    """Collection named by a catalog path, refused with a 404 if unreadable."""
+    match = CATALOG_COLLECTION.match((context.get("req") or {}).get("path") or "")
+    if not match:
+        return None
+    if not await _collection_readable(match["collection_id"], values):
+        raise HTTPException(status_code=404, detail="Record not found.")
+    return match["collection_id"]
+
+
 @dataclasses.dataclass
 class CollectionsFilter:
     """Collections sharing an auth:groups value with the caller."""
 
     async def __call__(self, context: dict[str, Any]) -> str | dict[str, Any]:
         values = _readable(context)
-        return "1=1" if values is None else _expr(values)
+        if values is None:
+            return "1=1"
+
+        await _catalog_collection_id(context, values)
+        return _expr(values)
 
 
 @dataclasses.dataclass
@@ -99,7 +133,8 @@ class ItemsFilter:
 
     /collections/{id}/items and .../items/{item_id} name their collection, so
     that one collection is the whole question - one lookup, whatever the size
-    of the catalogue. Only /search, which names none, has to resolve the set.
+    of the catalogue. So do the catalog paths to the same items. Only /search,
+    which names none, has to resolve the set.
     """
 
     async def __call__(self, context: dict[str, Any]) -> str | dict[str, Any]:
@@ -107,15 +142,14 @@ class ItemsFilter:
         if values is None:
             return "1=1"
 
+        if await _catalog_collection_id(context, values):
+            return "1=1"
+
         collection_id = ((context.get("req") or {}).get("path_params") or {}).get(
             "collection_id"
         )
         if collection_id:
-            collection = await asyncio.to_thread(
-                _get, f"/collections/{quote(collection_id, safe='')}"
-            )
-            groups = set(collection.get("auth:groups") or [])
-            return "1=1" if groups.intersection(values) else "1=0"
+            return "1=1" if await _collection_readable(collection_id, values) else "1=0"
 
         ids = await asyncio.to_thread(_readable_collection_ids, values)
         return {"op": "in", "args": [{"property": "collection"}, ids]} if ids else "1=0"

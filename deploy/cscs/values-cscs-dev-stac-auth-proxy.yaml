@@ -24,6 +24,12 @@ stac-auth-proxy:
         DEFAULT_PUBLIC: "true"
         COLLECTIONS_FILTER_CLS: "stac_auth_proxy.custom_filters:CollectionsFilter"
         ITEMS_FILTER_CLS: "stac_auth_proxy.custom_filters:ItemsFilter"
+        # The defaults plus the Catalogs extension's paths to the same
+        # collections and items. The collections pattern is tried first, so it
+        # must not match item paths. /catalogs/{id}/children is left out until
+        # the server honours `filter` there (stac-fastapi-pgstac 7.2.0 doesn't).
+        COLLECTIONS_FILTER_PATH: '^(/collections|/catalogs/[^/]+/collections)(/[^/]+)?$'
+        ITEMS_FILTER_PATH: '^((/catalogs/[^/]+)?/collections/[^/]+/items(/[^/]+)?|/collections/[^/]+/bulk_items|/search)$'
     customFiltersFile: "data/stac-auth-proxy/custom_filters.py"
     extraVolumes:
         - name: filters
