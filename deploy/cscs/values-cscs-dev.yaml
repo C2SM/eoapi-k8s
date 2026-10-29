@@ -92,8 +92,11 @@ browser:
   # Authelia advertises no end_session_endpoint, so the browser's OIDC logout
   # would throw and leave the shared session standing. Its portal logout is
   # the only thing that really signs a user out - same URL as
-  # narthex-frontend.logoutUrl below.
-  oidcLogoutUrl: "https://auth-prometheus-dev.c2sm-tds.c2sm.cscs.ch/logout"
+  # narthex-frontend.logoutUrl below. `rd={url}` brings the user back to the
+  # page they logged out from (the browser image fills in {url}, see
+  # deploy/browser-narthex/patches/); without it they are left on Authelia's
+  # sign-in form, and signing in there has no page to go back to.
+  oidcLogoutUrl: "https://auth-prometheus-dev.c2sm-tds.c2sm.cscs.ch/logout?rd={url}"
   # Serves /browser/silent-renew.html and points silent_redirect_uri at it.
   # Must be listed in the `stac-browser` client's redirect_uris in
   # deploy/cscs/auth-authelia/authelia-configmap.yaml - Authelia rejects any

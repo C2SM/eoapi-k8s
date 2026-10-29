@@ -67,6 +67,10 @@ wiring.
    none (Authelia 4.39 does not, and has no config option for it) — leaving
    the user signed in at the IdP with nothing to indicate it failed. It now
    clears local state and, if `authConfig.logoutUrl` is set, sends the browser
-   to the provider's own logout page.
+   to the provider's own logout page. A `{url}` in `logoutUrl` is replaced
+   with the current page, URL-encoded, for providers that can send the user
+   back afterwards (Authelia's `/logout?rd={url}`). Without it the user is
+   left on the provider's sign-in form, and signing in there has no page to
+   return to.
 
 Fixes 1, 2 and 5 are useful anywhere. Fix 3 is the one that matters here.
