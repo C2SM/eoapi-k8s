@@ -98,7 +98,9 @@ data:
         # every client_id. authelia_url must be a subdomain of `domain`.
         - domain: 'c2sm-tds.c2sm.cscs.ch'
           authelia_url: 'https://auth-prometheus-dev.c2sm-tds.c2sm.cscs.ch'
-          default_redirection_url: 'https://prometheus-dev.c2sm-tds.c2sm.cscs.ch/browser/'
+          # Where a sign-in with no destination lands, e.g. on the form shown
+          # after logging out of narthex: the catalog tree, not the flat list.
+          default_redirection_url: 'https://prometheus-dev.c2sm-tds.c2sm.cscs.ch/browser/catalogs/prometheus'
 
     regulation:
       max_retries: 5
