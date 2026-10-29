@@ -8,6 +8,9 @@ stac-fastapi-pgstac Catalogs extension (`ENABLE_CATALOGS_EXTENSION` in
 
 - `catalogs.yaml`: the tree: id, title, Markdown description and preview image
   per catalog.
+  The loader starts every description but the root's with the catalog's
+  total collection count and a one-line note that logins see different
+  subsets, so a catalog that looks empty to a visitor still says what it holds.
 - `load_catalogs.py`: the rules that put each collection into a leaf catalog,
   and the SQL generator.
 

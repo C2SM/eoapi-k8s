@@ -173,16 +173,27 @@ def walk(nodes, parent=None):
         yield from walk(node.get("children", []), node["id"])
 
 
-def catalog_document(node, parent):
+def catalog_document(node, parent, count):
     links = []
     if preview := node.get("preview"):
         links.append({"rel": "preview", **preview})
+    description = node["description"].strip()
+    # Every catalog but the root, whose description says it at length. First,
+    # so that the card's description, cut at 300 characters, keeps it.
+    if parent:
+        note = (
+            "**1 collection**; whether you see it depends on your login."
+            if count == 1
+            else f"**{count:,} collections** in total; how many of them you see"
+            " depends on your login."
+        )
+        description = f"{note}\n\n{description}"
     return {
         "type": "Catalog",
         "stac_version": "1.0.0",
         "id": node["id"],
         "title": node["title"],
-        "description": node["description"].strip(),
+        "description": description,
         "links": links,
         "parent_ids": [parent] if parent else [],
     }
@@ -243,7 +254,9 @@ def main():
         " RAISE EXCEPTION 'a catalog id is already used by a collection'; END IF; END $$;",
     ]
     for node, parent in nodes:
-        doc = json.dumps(catalog_document(node, parent), ensure_ascii=False)
+        doc = json.dumps(
+            catalog_document(node, parent, counts[node["id"]]), ensure_ascii=False
+        )
         if "$catalog$" in doc:
             sys.exit(f"{node['id']}: contains the SQL quote tag $catalog$")
         out.append(f"SELECT pgstac.upsert_collection($catalog${doc}$catalog$::jsonb);")
