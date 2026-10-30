@@ -45,6 +45,15 @@ data:
     # trustForwardHeader in oauth2-proxy-middleware.yaml.
     skip_auth_routes = ["^/(stac|browser)(/|$)", "^/$"]
 
+    # Map tiles are never a page to log in from: without a session, answer
+    # them 401 rather than with a login redirect. Each redirect sets its own
+    # ~400-byte CSRF cookie on the whole host for 15 minutes (see
+    # cookie_csrf_per_request), so a map shown to someone without a gate
+    # session - every anonymous visitor - pushed the Cookie header past
+    # nginx's 8 KB and /browser answered "400 Request Header Or Cookie Too
+    # Large". Matched on X-Forwarded-Uri like skip_auth_routes.
+    api_routes = ["^/(raster|vector|multidim)/.+/tiles/"]
+
     # The middleware calls `/`, not `/oauth2/auth`: the proxy handler answers
     # an anonymous browser with the login redirect itself (and AJAX with a JSON
     # 401), so no Traefik `errors` middleware is needed - one would also

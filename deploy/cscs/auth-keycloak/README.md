@@ -16,6 +16,9 @@ Keycloak  auth.cscs.ch/auth/realms/cscs
 `/browser` is public static UI, `/stac` authenticates itself and `/` is the
 landing page that sends visitors on to the catalogue, so all three are
 `skip_auth_routes` in oauth2-proxy. narthex sits outside the gate entirely.
+Map tiles without a gate session get a 401 instead of a login redirect
+(`api_routes`): every redirect leaves a CSRF cookie behind, and a map's worth
+of them made `/browser` answer `400 Request Header Or Cookie Too Large`.
 
 **Status: in test.** Authelia stays deployed alongside and untouched until this
 is accepted - see [Roll back](#roll-back).
