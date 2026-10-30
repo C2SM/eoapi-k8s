@@ -170,7 +170,7 @@ narthex-frontend:
   # overlay could only set it by repeating this list. It is the CSCS Keycloak
   # client the narthex-launch notebooks log in to /stac with (device flow, no
   # secret); the notebooks take the issuer from /stac, which only that overlay
-  # switches to Keycloak, and this branch does not render without it.
+  # switches to Keycloak, and the chart does not render without it.
   launchConfigs:
     - id: santis-launcher
       label: Santis Earth Data Launcher

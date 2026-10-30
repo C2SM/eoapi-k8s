@@ -8,8 +8,9 @@ Apply the Traefik middleware first:
 kubectl apply -f deploy/cscs/traefik-ipallowlist.yaml
 ```
 
-Install or upgrade the release - on this branch, in the order given in
-`deploy/cscs/auth-keycloak/README.md` ("Deploy for testing"):
+Install or upgrade the release (after a rollback to Authelia, switch back in
+the order given in `deploy/cscs/auth-keycloak/README.md`, "Switching over from
+Authelia"):
 
 ```bash
 helm upgrade --install eoapi ./charts/eoapi \
@@ -38,24 +39,26 @@ The ingress middleware annotation uses Traefik's Kubernetes CRD reference form:
 eoapi-dev-eoapi-dev-ipallowlist@kubernetescrd
 ```
 
-## CSCS Keycloak Auth (in test)
+## CSCS Keycloak Auth
 
-`deploy/cscs/auth-keycloak/` is the auth path on this branch. CSCS's
-production Keycloak (`auth.cscs.ch`, realm `cscs`, client `prometheus-tds`) is the
-OIDC provider and the shared SSO session; oauth2-proxy, using that confidential
-client, is the Traefik ForwardAuth gate for `/raster`, `/vector`, `/multidim`
-and the `/` doc server. `/stac` authenticates itself via stac-auth-proxy,
-`/browser` is public static UI, and narthex sits outside the gate as its own
-OIDC client. The IP allowlist stays on everything.
+`deploy/cscs/auth-keycloak/` is the auth path, live since 2026-10-30
+(`v1.3.0-prometheus`). CSCS's production Keycloak (`auth.cscs.ch`, realm
+`cscs`, client `prometheus-tds`) is the OIDC provider and the shared SSO
+session; oauth2-proxy, using that confidential client, is the Traefik
+ForwardAuth gate for `/raster`, `/vector` and `/multidim`. `/stac`
+authenticates itself via stac-auth-proxy, `/browser` is public static UI, the
+`/` landing page is public, and narthex sits outside the gate as its own OIDC
+client. The IP allowlist stays on everything.
 
 Every IdP-facing value is in `values-cscs-dev-auth-keycloak.yaml`, endpoints
 and client ID in its `keycloak:` section; the gate's client secret is the
 `oauth2-proxy-keycloak-secret` Secret. Authelia stays deployed, unreferenced,
-until this is accepted, so `main` can be redeployed at any time.
+until it is retired, so `v1.2.1-prometheus` - the last Authelia release - can
+be redeployed to roll back.
 
 `deploy/cscs/auth-keycloak/README.md` has what is known about the realm, the
-redirect URIs to register, the network precondition (the cluster cannot reach
-`auth.cscs.ch` yet), the deploy order, the logs to watch and the rollback.
+registered redirect URIs, the network precondition, the switch-over order, the
+logs to watch and the rollback.
 
 All three values files, every time: omitting the Keycloak one fails the render,
 omitting the stac-auth-proxy one silently disables group filtering and the
