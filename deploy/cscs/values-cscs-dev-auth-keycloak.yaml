@@ -65,7 +65,7 @@ narthex-frontend:
   oidcScope: "openid profile email"
   logoutUrl: *logoutUrl
 
-# oauth2-proxy's ForwardAuth gate on /raster, /vector, /multidim and /. It must
+# oauth2-proxy's ForwardAuth gate on /raster, /vector and /multidim. It must
 # precede strip-prefix, since it matches its skip routes on the full path.
 # References are <namespace>-<name>@kubernetescrd; a wrong name silently drops
 # the whole router instead of failing, so check the rendered annotation with

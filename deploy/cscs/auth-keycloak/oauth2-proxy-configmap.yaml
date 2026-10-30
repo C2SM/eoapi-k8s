@@ -1,6 +1,6 @@
 # oauth2-proxy as the ForwardAuth gate for what has no auth of its own on the
-# eoAPI host: /raster, /vector, /multidim and the / doc server. Keycloak has
-# no ForwardAuth endpoint, so this is the piece that replaces Authelia's.
+# eoAPI host: /raster, /vector and /multidim. Keycloak has no ForwardAuth
+# endpoint, so this is the piece that replaces Authelia's.
 #
 # The confidential prometheus-tds client: client_secret and cookie_secret come
 # from the oauth2-proxy-keycloak-secret Secret as env vars (see
@@ -39,9 +39,11 @@ data:
 
     # /stac authenticates itself (stac-auth-proxy) and /browser is public
     # static UI; gating either kills anonymous access to public collections.
-    # Matched against X-Forwarded-Uri, which the middleware sets from the real
-    # request - see trustForwardHeader in oauth2-proxy-middleware.yaml.
-    skip_auth_routes = ["^/(stac|browser)(/|$)"]
+    # `/` is the landing page that sends visitors on to the catalogue, so it
+    # must not demand a login either. Matched against the path of
+    # X-Forwarded-Uri, which the middleware sets from the real request - see
+    # trustForwardHeader in oauth2-proxy-middleware.yaml.
+    skip_auth_routes = ["^/(stac|browser)(/|$)", "^/$"]
 
     # The middleware calls `/`, not `/oauth2/auth`: the proxy handler answers
     # an anonymous browser with the login redirect itself (and AJAX with a JSON

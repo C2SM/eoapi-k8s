@@ -7,13 +7,14 @@ paths with no auth of their own.
 
 ```text
 Keycloak  auth.cscs.ch/auth/realms/cscs
-  ├── prometheus-tds (confidential)      oauth2-proxy ForwardAuth ──→ /raster, /vector, /multidim, /
+  ├── prometheus-tds (confidential)      oauth2-proxy ForwardAuth ──→ /raster, /vector, /multidim
   ├── prometheus-tds-web (public, PKCE)  stac-browser ──→ stac-auth-proxy validates the token on /stac
   │                                      narthex SPA  ──→ narthex-backend validates the token on /api
   └── prometheus-tds-jupyter (public, device flow)  notebooks ──→ /stac, see Notebook clients
 ```
 
-`/browser` is public static UI and `/stac` authenticates itself, so both are
+`/browser` is public static UI, `/stac` authenticates itself and `/` is the
+landing page that sends visitors on to the catalogue, so all three are
 `skip_auth_routes` in oauth2-proxy. narthex sits outside the gate entirely.
 
 **Status: in test.** Authelia stays deployed alongside and untouched until this
