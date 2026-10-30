@@ -30,6 +30,18 @@ stac:
       # /catalogs: the collection groups loaded by deploy/cscs/catalogs/.
       # Read-only - transactions stay off, so no catalog write endpoints.
       ENABLE_CATALOGS_EXTENSION: "true"
+      # The API landing page, which is also /browser's root page. Unset, all
+      # three read "stac-fastapi". The id is not "prometheus": that is the
+      # top catalog's (catalogs/catalogs.yaml).
+      STAC_FASTAPI_LANDING_ID: "prometheus-dev"
+      STAC_FASTAPI_TITLE: "PromETHeus"
+      STAC_FASTAPI_DESCRIPTION: |
+        Earth-observation, field-campaign and model data catalogued by C2SM on
+        CSCS infrastructure.
+
+        **What you see depends on your login.** Without logging in you see only
+        public collections; once logged in you also see the collections your
+        groups give you access to.
 
 raster:
   enabled: true
