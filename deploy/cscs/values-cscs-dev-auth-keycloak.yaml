@@ -1,11 +1,13 @@
-# CSCS Keycloak: every identity-provider value of the eoapi-dev deployment.
+# CSCS Keycloak: every identity-provider value of the eoapi-dev deployment but
+# one, the notebooks' client ID (narthex-frontend.launchConfigs[].stacOidcClientId),
+# which sits in values-cscs-dev.yaml because Helm replaces lists whole.
 # Apply last, after values-cscs-dev.yaml and values-cscs-dev-stac-auth-proxy.yaml.
 #
-# One confidential client, prometheus-tds, on CSCS's production Keycloak. The oauth2-proxy
-# gate (auth-keycloak/) uses it with its secret; the SPAs below are configured
-# with it too, but a browser cannot authenticate a confidential client, so
-# their logins fail at the token exchange until they get a public client - see
-# auth-keycloak/README.md.
+# Clients on CSCS's production Keycloak (see auth-keycloak/README.md):
+# prometheus-tds, confidential, for the oauth2-proxy gate (auth-keycloak/, with
+# its secret); prometheus-tds-web, public (no secret, PKCE), for the SPAs below,
+# which run in the browser and so cannot hold a secret; prometheus-tds-jupyter,
+# public (device flow), for the notebooks - set in values-cscs-dev.yaml.
 
 # Not read by the chart. Anchors only, so each endpoint and client ID is
 # written once and every consumer below follows it.
@@ -15,11 +17,14 @@ keycloak:
   # Ends the CSCS SSO session, i.e. every CSCS app (jupyter-santis included),
   # not just this one.
   logoutUrl: &logoutUrl "https://auth.cscs.ch/auth/realms/cscs/protocol/openid-connect/logout"
-  client: &client "prometheus-tds"
-  # What prometheus-tds access tokens carry today: the client has no Audience
-  # mapper, and `account` is in practically every token the realm issues, so
-  # it restricts little beyond "issued by this realm". Switch to *client once
-  # CSCS adds a mapper putting prometheus-tds in aud.
+  # The SPAs' public client. The gate's own client is in
+  # auth-keycloak/oauth2-proxy-configmap.yaml.
+  client: &client "prometheus-tds-web"
+  # What the realm's access tokens carry today (the notebook client's: ["broker",
+  # "account"]): no client has an Audience mapper, and `account` is in
+  # practically every token the realm issues, so it restricts little beyond
+  # "issued by this realm". Narrow it only once every client calling /stac and
+  # narthex - prometheus-tds-web and prometheus-tds-jupyter - puts itself in aud.
   audience: &audience "account"
 
 browser:
@@ -35,9 +40,10 @@ browser:
   oidcLogoutUrl: *logoutUrl
   # /browser/silent-renew.html must be a valid redirect URI on the client.
   oidcSilentRenew: true
-  # Off while the browser cannot complete a login (see top of file): with an
-  # unregistered silent-renew URI every page load would stall ~10s on it.
-  oidcAutoSignIn: false
+  # Picks up an existing CSCS session on page load, as Authelia's did. Needs
+  # /browser/silent-renew.html registered on the client (it is, 2026-10-30):
+  # otherwise every page load stalls ~10s on it - then set this to false.
+  oidcAutoSignIn: true
 
 stac-auth-proxy:
   env:

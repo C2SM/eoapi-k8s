@@ -153,6 +153,7 @@ narthex-backend:
 narthex-frontend:
   enabled: true
   image:
+    tag: "v1.2.0-kc"
     pullPolicy: Always
   ingress:
     enabled: false
@@ -161,6 +162,13 @@ narthex-frontend:
   # narthex's own local-dev fallback (DEV_DEFAULT_LAUNCH_CONFIGS in
   # frontend/src/launchConfigs.ts), carried over here since a deployed image
   # never falls back to it itself.
+  #
+  # stacOidcClientId is the one identity-provider value outside
+  # values-cscs-dev-auth-keycloak.yaml: Helm replaces lists whole, so that
+  # overlay could only set it by repeating this list. It is the CSCS Keycloak
+  # client the narthex-launch notebooks log in to /stac with (device flow, no
+  # secret); the notebooks take the issuer from /stac, which only that overlay
+  # switches to Keycloak, and this branch does not render without it.
   launchConfigs:
     - id: santis-launcher
       label: Santis Earth Data Launcher
@@ -169,6 +177,7 @@ narthex-frontend:
       uenv: eobs-lab     # name part must match `uenv status` output
       venv: narthex-named-list-viewer
       notebook: named-list-viewer
+      stacOidcClientId: prometheus-tds-jupyter
       # Shown in an acknowledgement modal before the launch proceeds. Neither
       # choice below can be made for the user from here - the uenv and the
       # reservation are picked on the Hub's own spawn form - so this is the
@@ -189,6 +198,7 @@ narthex-frontend:
       uenv: eobs-lab
       venv: narthex-stac-sim-viewer
       notebook: stac-sim-viewer
+      stacOidcClientId: prometheus-tds-jupyter
 
     - id: "santis-test-notebook"
       label: "Santis Test Notebook"

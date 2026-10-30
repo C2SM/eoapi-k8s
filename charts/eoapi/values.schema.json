@@ -832,6 +832,10 @@
               "notebook": {
                 "type": "string"
               },
+              "stacOidcClientId": {
+                "type": "string",
+                "description": "OIDC client the launched notebooks use for STAC logins (device flow, public client). Unset falls back to narthex-python-client"
+              },
               "message": {
                 "type": "string",
                 "description": "Plain text shown in an acknowledgement modal before launching; never rendered as HTML"

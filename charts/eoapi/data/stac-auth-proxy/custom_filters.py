@@ -29,13 +29,20 @@ logger = logging.getLogger(__name__)
 ADMIN_GROUP = "prometheus_all"
 # auth:groups value that grants everyone, authenticated or not.
 PUBLIC = "public"
-# Both spellings CSCS listed for each role grant the same collections. No role
-# maps to "noaa" yet, so noaa-only collections are readable by ADMIN_GROUP only.
+# Role -> auth:groups value; each role with and without "tds_". The dyamond
+# roles exist misspelled: "dynamo" is what a real token carries, "dyanamo" is
+# how CSCS reported it, and both are to become "dyamond". Until then all three
+# spellings map. No role maps to "noaa" yet, so noaa-only collections are
+# readable by ADMIN_GROUP only.
 GROUPS = {
     "prometheus_nasa": "nasa",
     "prometheus_tds_nasa": "nasa",
-    "prometheus_dyanamo": "dyamond",
+    "prometheus_dyamond": "dyamond",
+    "prometheus_tds_dyamond": "dyamond",
+    "prometheus_dynamo": "dyamond",
     "prometheus_tds_dynamo": "dyamond",
+    "prometheus_dyanamo": "dyamond",
+    "prometheus_tds_dyanamo": "dyamond",
 }
 CACHE_TTL = 60
 PAGE = 1000

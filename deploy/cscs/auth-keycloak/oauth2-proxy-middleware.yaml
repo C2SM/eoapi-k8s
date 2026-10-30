@@ -6,10 +6,11 @@
 # oauth2-proxy-configmap.yaml for why.
 #
 # `allowed_groups` on the address is the gate: a signed-in user holding none
-# of them gets a 403. Every CSCS prometheus_* role is listed in each form
-# oauth2-proxy's keycloak-oidc provider can hand it over in - a `groups` claim
-# value, `role:<realm role>`, `role:<client>:<client role>` - since which one
-# the realm uses is not yet known. The login log line shows the actual form.
+# of them gets a 403. The names are those custom_filters.py maps, dyamond in
+# all three spellings, each in every form oauth2-proxy's keycloak-oidc provider
+# can hand it over in - a `groups` claim value, `role:<realm role>`,
+# `role:<client>:<client role>`. Real tokens carry them in `groups` (CSCS: the
+# realm has no prometheus_* roles); the login log line shows the actual form.
 #
 # trustForwardHeader is deliberately false. oauth2-proxy matches its
 # skip_auth_routes against X-Forwarded-Uri, so a client-supplied
@@ -25,5 +26,5 @@ metadata:
     app.kubernetes.io/part-of: eoapi-dev-auth-keycloak
 spec:
   forwardAuth:
-    address: "http://eoapi-dev-oauth2-proxy.eoapi-dev.svc.cluster.local:4180/?allowed_groups=prometheus_all,prometheus_nasa,prometheus_tds_nasa,prometheus_dyanamo,prometheus_tds_dynamo,role:prometheus_all,role:prometheus_nasa,role:prometheus_tds_nasa,role:prometheus_dyanamo,role:prometheus_tds_dynamo,role:prometheus-tds:prometheus_all,role:prometheus-tds:prometheus_nasa,role:prometheus-tds:prometheus_tds_nasa,role:prometheus-tds:prometheus_dyanamo,role:prometheus-tds:prometheus_tds_dynamo"
+    address: "http://eoapi-dev-oauth2-proxy.eoapi-dev.svc.cluster.local:4180/?allowed_groups=prometheus_all,prometheus_nasa,prometheus_tds_nasa,prometheus_dyamond,prometheus_tds_dyamond,prometheus_dynamo,prometheus_tds_dynamo,prometheus_dyanamo,prometheus_tds_dyanamo,role:prometheus_all,role:prometheus_nasa,role:prometheus_tds_nasa,role:prometheus_dyamond,role:prometheus_tds_dyamond,role:prometheus_dynamo,role:prometheus_tds_dynamo,role:prometheus_dyanamo,role:prometheus_tds_dyanamo,role:prometheus-tds:prometheus_all,role:prometheus-tds:prometheus_nasa,role:prometheus-tds:prometheus_tds_nasa,role:prometheus-tds:prometheus_dyamond,role:prometheus-tds:prometheus_tds_dyamond,role:prometheus-tds:prometheus_dynamo,role:prometheus-tds:prometheus_tds_dynamo,role:prometheus-tds:prometheus_dyanamo,role:prometheus-tds:prometheus_tds_dyanamo"
     trustForwardHeader: false

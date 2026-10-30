@@ -855,6 +855,9 @@ narthex-frontend:
   #     uenv: "eobs-lab/1.0:v1"
   #     venv: "/path/to/venv"
   #     notebook: "named-list-viewer"
+  #     # OIDC client the launched notebook logs in to the STAC API with
+  #     # (device flow, public client). Unset falls back to narthex-python-client.
+  #     stacOidcClientId: "my-notebook-client"
   launchConfigs: []
   imagePullSecrets: []
   settings:

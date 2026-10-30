@@ -6,10 +6,11 @@ CSCS portal. Keycloak has no ForwardAuth endpoint, so oauth2-proxy gates the
 paths with no auth of their own.
 
 ```text
-Keycloak  auth.cscs.ch/auth/realms/cscs, client prometheus-tds (confidential)
-  ├── oauth2-proxy ForwardAuth ──→ /raster, /vector, /multidim, /
-  ├── stac-browser  ──→ stac-auth-proxy validates the token on /stac
-  └── narthex SPA   ──→ narthex-backend validates the token on /api
+Keycloak  auth.cscs.ch/auth/realms/cscs
+  ├── prometheus-tds (confidential)      oauth2-proxy ForwardAuth ──→ /raster, /vector, /multidim, /
+  ├── prometheus-tds-web (public, PKCE)  stac-browser ──→ stac-auth-proxy validates the token on /stac
+  │                                      narthex SPA  ──→ narthex-backend validates the token on /api
+  └── prometheus-tds-jupyter (public, device flow)  notebooks ──→ /stac, see Notebook clients
 ```
 
 `/browser` is public static UI and `/stac` authenticates itself, so both are
@@ -23,6 +24,7 @@ is accepted - see [Roll back](#roll-back).
 | What | Where |
 |---|---|
 | Issuer, logout URL, client ID, audience, SPA scopes | `keycloak:` section of `../values-cscs-dev-auth-keycloak.yaml` |
+| Notebook client (`stacOidcClientId`) | each `narthex-launch` entry of `narthex-frontend.launchConfigs` in `../values-cscs-dev.yaml` - the one value outside the overlay, see [Notebook clients](#notebook-clients) |
 | Gate client, cookie | `oauth2-proxy-configmap.yaml` |
 | Gate roles (`allowed_groups`) | `oauth2-proxy-middleware.yaml` |
 | Role → collections | `charts/eoapi/data/stac-auth-proxy/custom_filters.py` |
@@ -36,28 +38,33 @@ follows it.
 
 CSCS first issued `prometheus-tds` on its TDS Keycloak (`auth-tds.cscs.ch`),
 then moved it to production with a new secret. Verified on `auth.cscs.ch`:
-the secret is accepted, the client has no service account, the device grant
-is disabled, and none of the redirect URIs below is registered yet. The token
-facts below come from the TDS client's service-account token, which prod
-cannot issue - confirm them with `inspect-claims.py` once a redirect URI is
-registered.
+the secret is accepted, the client has no service account and the device
+grant is disabled. Some token facts below come from the TDS client's
+service-account token, which prod cannot issue - confirm them with a real
+login (the `AuthSuccess` and `custom_filters` log lines show them).
 
-- **One confidential client.** The gate uses it with its secret. stac-browser
-  and the narthex SPA are configured with it too, but a browser cannot
-  authenticate a confidential client, so **their logins fail at the token
-  exchange** until CSCS provides a public client (PKCE, no secret) or the
-  portal can make one. Then point `keycloak.client` at it for the SPAs.
+- **A confidential client for the gate, a public one for the SPAs.** The gate
+  uses `prometheus-tds` with its secret. stac-browser and the narthex SPA run
+  in the browser, which cannot keep a secret, so they use `prometheus-tds-web`
+  (`keycloak.client`): no secret, PKCE, created by CSCS 2026-10-29 with both
+  SPAs' origins as web origins. Without a secret a token request with a bad
+  code gets `invalid_grant` rather than `unauthorized_client` - that is how
+  to tell a public client from outside. Not yet seen: whether its tokens carry
+  `groups`; the first browser login's `custom_filters` line shows it.
 - **`aud` is `account`**, which practically every token of the realm carries.
   stac-auth-proxy and narthex-backend accept it for now; once CSCS adds an
   Audience mapper putting the client in `aud`, switch `keycloak.audience` to
   the client ID.
-- **`groups` holds role names**, without a leading slash: today it mirrors the
-  realm roles. The roles CSCS reported are `prometheus_all`,
-  `prometheus_nasa`, `prometheus_tds_nasa`, `prometheus_dyanamo`,
-  `prometheus_tds_dynamo` (spelled as reported). `custom_filters.py` reads
-  them from `groups`, realm roles and the client's own roles, and maps
-  `prometheus_all` to unfiltered, `*_nasa` to `nasa`, `*_dynamo`/`*_dyanamo`
-  to `dyamond`. No role maps to `noaa`.
+- **`groups` holds the `prometheus_*` group names.** CSCS says the realm has
+  no `prometheus_*` roles, so they are Keycloak groups. CSCS reported
+  `prometheus_all`, `prometheus_nasa`, `prometheus_tds_nasa`,
+  `prometheus_dyanamo`, `prometheus_tds_dynamo` (spelled as reported); a real
+  token (2026-10-28, see [Notebook clients](#notebook-clients)) carries
+  `prometheus_dynamo`, and every group twice, as `/name` and `name`.
+  `custom_filters.py` reads them from `groups`, realm roles and the client's
+  own roles, and maps `prometheus_all` to unfiltered, `*_nasa` to `nasa`, and
+  `*_dynamo`, `*_dyanamo` and `*_dyamond` - the spelling they are to be fixed
+  to - to `dyamond`, each with and without `tds_`. No role maps to `noaa`.
 - **Access tokens live 300s**; `cookie_refresh = "4m"` stays below that.
 - **`email_verified` is false**, hence `insecure_oidc_allow_unverified_email`
   in the gate - nothing authorizes by email.
@@ -65,14 +72,17 @@ registered.
 - **`groups` is a default client scope**, so it arrives without being
   requested.
 
-### Redirect URIs to register on `prometheus-tds`
+### Redirect URIs
 
-| URI | for |
-|---|---|
-| `https://prometheus-dev.c2sm-tds.c2sm.cscs.ch/oauth2/callback` | the gate - required |
-| `http://localhost:8765/callback` | `inspect-claims.py` |
-| `https://prometheus-dev.c2sm-tds.c2sm.cscs.ch/browser/auth`, `…/browser/silent-renew.html` | stac-browser, once it has a public client |
-| `https://narthex-prometheus-dev.c2sm-tds.c2sm.cscs.ch/auth/callback` | narthex, once it has a public client |
+| Client | URI | for | registered |
+|---|---|---|---|
+| `prometheus-tds` | `https://prometheus-dev.c2sm-tds.c2sm.cscs.ch/oauth2/callback` | the gate | yes, 2026-10-29 |
+| `prometheus-tds` | `http://localhost:8765/callback` | `inspect-claims.py` | no |
+| `prometheus-tds-web` | `https://prometheus-dev.c2sm-tds.c2sm.cscs.ch/browser/auth`, `…/browser/silent-renew.html` | stac-browser | yes, 2026-10-29 |
+| `prometheus-tds-web` | `https://narthex-prometheus-dev.c2sm-tds.c2sm.cscs.ch/auth/callback` | narthex | yes, 2026-10-29 |
+
+No post-logout redirect URI is registered, so logging out ends on Keycloak's
+own page rather than back in the app.
 
 Check one without logging in - Keycloak answers an unregistered one with
 `Invalid parameter: redirect_uri`:
@@ -85,6 +95,47 @@ curl -s -G \
   --data-urlencode redirect_uri=https://prometheus-dev.c2sm-tds.c2sm.cscs.ch/oauth2/callback \
   | grep -o 'Invalid parameter: [a-z_]*' || echo registered
 ```
+
+## Notebook clients
+
+The narthex-launch notebooks log in to `/stac` themselves, with the device
+flow and no secret. `prometheus-tds` requires its secret and answers that with
+`unauthorized_client`, so CSCS issued two public clients for them:
+
+| Client | For |
+|---|---|
+| `prometheus-tds-jupyter` | this deployment (TDS/dev) |
+| `prometheus-prod-jupyter` | a future production deployment - nothing here uses it, and it has never had a real login |
+
+Verified 2026-10-28 with a device-flow login on `prometheus-tds-jupyter`: `iss`
+`https://auth.cscs.ch/auth/realms/cscs`, `aud` `["broker", "account"]`, `azp`
+`prometheus-tds-jupyter`, `preferred_username` set, every group as both
+`/name` and `name`. It passes stac-auth-proxy's `ALLOWED_JWT_AUDIENCES`
+(`account`) and narthex-backend's `oidcAudiences`.
+
+Each `narthex-launch` launch config names the client in `stacOidcClientId`.
+It sits in `../values-cscs-dev.yaml`, not the overlay, because Helm replaces
+lists whole and the overlay would have to repeat the entire list. The narthex
+frontend passes it to the launcher as `?stac_client_id=`; the launcher in the
+eobs-lab uenv writes it into the `STAC_OIDC_CLIENT_ID` line of a new notebook,
+and rewrites that line in existing notebooks on every launch. The notebooks
+take the issuer from `/stac`'s advertised OIDC discovery URL.
+`santis-test-notebook` opens a notebook directly and never reaches the
+launcher, so it has none.
+
+- **Inert until narthex is released.** The field needs a narthex release and
+  two rebuilds from it: the narthex-frontend image, and the eobs-lab uenv
+  after bumping `NARTHEX_TAG` in software-stack-recipes'
+  `recipes/eobs-lab/`. Merging before that is safe: an old frontend ignores
+  the field, and an old launcher ignores the extra query argument.
+- **Never on the Authelia deployment.** Unset, the notebooks fall back to
+  `narthex-python-client`, the Authelia client: right under Authelia, a failed
+  login under Keycloak, so the field is required once this branch is deployed.
+  The client ID and the issuer must switch together, which they do only when
+  this branch is deployed: it does not render without the Keycloak overlay,
+  and [Roll back](#roll-back) reinstalls from a clean `main`, which has no
+  `stacOidcClientId`. Do not bring the field to `main` while `main` deploys
+  Authelia.
 
 ## Network
 
@@ -192,12 +243,10 @@ shows the gate session's user, email and groups.
 
 ## Test
 
-What can work with the one confidential client:
-
 1. **Gate.** Open `https://prometheus-dev.c2sm-tds.c2sm.cscs.ch/raster/` in the
    tunnelled Firefox: CSCS login, then the raster landing page for a user with
-   a `prometheus_*` role and `Forbidden` for one without. The `AuthSuccess`
-   line shows which form the roles arrived in.
+   a `prometheus_*` group and `Forbidden` for one without. The `AuthSuccess`
+   line shows which form the groups arrived in.
 2. **Anonymous `/stac`.** `curl -s https://prometheus-dev.c2sm-tds.c2sm.cscs.ch/stac/collections | jq '.collections[].id'`
    returns the public collection only.
 3. **`/stac` with a user token** - stands in for the browser login:
@@ -210,10 +259,12 @@ What can work with the one confidential client:
    ```
 
    and the matching `custom_filters` log line. The token lives 300s.
-
-Expected to fail until there is a public client: the stac-browser and narthex
-logins (token exchange rejected), the SaveToNarthex widget and narthex's own
-UI (no token to send).
+4. **stac-browser login.** "Log in" on a catalog page: CSCS login, back on the
+   same page, restricted collections now listed. The `custom_filters` line for
+   that user must show the `prometheus_*` groups - `roles=[]` means
+   `prometheus-tds-web` tokens lack `groups`, which CSCS has to add.
+5. **narthex.** Log in to `https://narthex-prometheus-dev.c2sm-tds.c2sm.cscs.ch`,
+   and save an item from stac-browser with the SaveToNarthex widget.
 
 ## Roll back
 
@@ -289,8 +340,9 @@ browser lands on.
   server with GET, so oauth2-proxy never sees an OPTIONS. Nothing calls
   `/raster` or `/vector` cross-origin today.
 - **narthex_client** discovers the issuer from `/stac`'s `auth:schemes`, so it
-  follows this change on its own, but it uses the device grant, which is
-  disabled on `prometheus-tds`.
+  follows this change on its own. Its client is the launch config's
+  `stacOidcClientId`, since it uses the device grant, which is disabled on
+  `prometheus-tds` - see [Notebook clients](#notebook-clients).
 - **Retiring Authelia**, once this is accepted:
   `git archive c2sm/main deploy/cscs/auth-authelia | tar -x -C /tmp`, then
   `kubectl delete -f /tmp/deploy/cscs/auth-authelia/` and
