@@ -74,3 +74,13 @@ wiring.
    return to.
 
 Fixes 1, 2 and 5 are useful anywhere. Fix 3 is the one that matters here.
+
+## 0002-header-title-link.patch
+
+Makes the header title (catalog title and logo) link to
+`window.STAC_BROWSER_CONFIG.headerTitleUrl`, a STAC URL, instead of the API
+root. Unset, it links to the root as before. stac-browser has no option for
+this, and a server-side redirect of `/browser/` would not help: the title is a
+router link, so clicking it never reaches the server. Set it as the
+`SB_headerTitleUrl` env var: the entrypoint passes SB_* vars missing from
+`config.schema.json` through as strings.

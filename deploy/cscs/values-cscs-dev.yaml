@@ -66,11 +66,11 @@ browser:
   # as narthex-backend/narthex-frontend.
   image:
     name: ghcr.io/c2sm/eoapi-browser-narthex
-    # Moving pre-release tag, rebuilt whenever the widget changes - so it must
-    # be pullPolicy: Always, exactly like narthex-backend/narthex-frontend
-    # below. IfNotPresent would keep serving whatever layer a node already
-    # cached under this tag string, ignoring new pushes.
-    tag: "v5.0.0-alpha"
+    # stac-browser v5.0.0 + narthex v1.2.0's widget + deploy/browser-narthex/
+    # patches as of v1.3.0-prometheus; one tag per build, so a Helm rollback
+    # gets the image it was deployed with. Always, because the earlier
+    # v5.0.0-alpha tag was rebuilt in place.
+    tag: "v5.0.0-prometheus-1.3.0"
     pullPolicy: Always
   imagePullSecrets:
     - name: narthex-ghcr-pull-secret
@@ -99,6 +99,11 @@ browser:
   extraEnv:
     - name: SB_useTileLayerAsFallback
       value: "false"
+    # The header title links to the catalog tree instead of the API root's
+    # ungrouped collection list. Read only by an image built with
+    # deploy/browser-narthex/patches/0002-header-title-link.patch.
+    - name: SB_headerTitleUrl
+      value: "https://prometheus-dev.c2sm-tds.c2sm.cscs.ch/stac/catalogs/prometheus"
   # buildTileUrlTemplate has no SB_* equivalent (it's a JS callback), so it's
   # the only thing left in customConfig; everything else above now flows
   # through SB_* env vars into stac-browser's own runtime-config.js.

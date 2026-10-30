@@ -1,0 +1,28 @@
+diff --git a/src/StacBrowser.vue b/src/StacBrowser.vue
+index d06959a..c3bbe73 100644
+--- a/src/StacBrowser.vue
++++ b/src/StacBrowser.vue
+@@ -23,7 +23,7 @@
+             </b-button-group>
+           </nav>
+           <div class="title">
+-            <StacLink v-if="root" :data="root">
++            <StacLink v-if="root" :data="headerTitleLink || root">
+               <HeaderTitle ref="headerTitle" />
+             </StacLink>
+             <HeaderTitle v-else ref="headerTitle" />
+@@ -191,6 +191,14 @@ export default defineComponent({
+     ...mapGetters(['canSearch', 'collectionLink', 'fromBrowserPath', 'isExternalUrl', 'isRoot', 'parentLink', 'root', 'searchBrowserLink', 'supportsConformance', 'title', 'toBrowserPath']),
+     ...mapGetters('auth', { authMethod: 'method' }),
+     ...mapGetters('auth', ['canAuthenticate', 'isLoggedIn', 'showLogin']),
++    // headerTitleUrl: a STAC URL for the header title to link to instead of
++    // the API root, e.g. a catalog that is the real entry point.
++    headerTitleLink() {
++      if (!CONFIG.headerTitleUrl) {
++        return null;
++      }
++      return { href: CONFIG.headerTitleUrl, rel: 'child', type: 'application/json' };
++    },
+     browserVersion() {
+       if (typeof STAC_BROWSER_VERSION !== 'undefined') {
+         return STAC_BROWSER_VERSION;
