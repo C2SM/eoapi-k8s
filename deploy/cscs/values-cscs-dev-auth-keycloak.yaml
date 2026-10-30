@@ -36,8 +36,12 @@ browser:
   oidcScope: "openid profile email"
   # Keycloak advertises an end_session_endpoint, but the patched browser build
   # (deploy/browser-narthex/patches) never calls signoutRedirect(): it clears
-  # its own tokens and sends the browser here.
-  oidcLogoutUrl: *logoutUrl
+  # its own tokens and sends the browser here. *logoutUrl plus a way back:
+  # Keycloak only redirects to the client's registered URIs, so it returns to
+  # silent-renew.html, which forwards to the page in `state` ({url} is the page
+  # logout was clicked on). Keycloak asks "Do you want to log out?" first, as
+  # no id_token_hint is sent.
+  oidcLogoutUrl: "https://auth.cscs.ch/auth/realms/cscs/protocol/openid-connect/logout?client_id=prometheus-tds-web&post_logout_redirect_uri=https%3A%2F%2Fprometheus-dev.c2sm-tds.c2sm.cscs.ch%2Fbrowser%2Fsilent-renew.html&state={url}"
   # /browser/silent-renew.html must be a valid redirect URI on the client.
   oidcSilentRenew: true
   # Picks up an existing CSCS session on page load, as Authelia's did. Needs

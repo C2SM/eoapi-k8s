@@ -700,7 +700,10 @@ browser:
   # at the identity provider itself. Needed for providers that advertise no
   # end_session_endpoint (e.g. Authelia), where the OIDC RP-initiated logout
   # the browser would otherwise attempt fails and leaves the IdP session
-  # standing. Leave empty for providers that do advertise one.
+  # standing. Leave empty for providers that do advertise one. A `{url}` in it
+  # becomes the current page, URL-encoded. To return there from a provider
+  # that only redirects to registered URIs (Keycloak), use the silent-renew
+  # page as post_logout_redirect_uri and `state={url}` (see oidcSilentRenew).
   oidcLogoutUrl: ""
   # Serve a small silent-renew landing page at <browser path>/silent-renew.html
   # and point oidc-client-ts's silent_redirect_uri at it. Without it that

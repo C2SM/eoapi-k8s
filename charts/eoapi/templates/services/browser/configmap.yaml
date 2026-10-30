@@ -19,16 +19,32 @@ data:
   # every attempt. All the parent needs is the callback URL handed back:
   # oidc-client-ts listens for exactly this message, checks the origin, and
   # matches `state` itself.
+  #
+  # Loaded as a top-level page instead, it is a post-logout landing page: an
+  # already-registered redirect URI the provider can send the user back to
+  # after logout, with the page to return to in `state` (see oidcLogoutUrl).
+  # Only a page of this origin is followed, so it is no open redirect.
   silent-renew.html: |-
     <!doctype html>
     <html lang="en">
       <head><meta charset="utf-8"><title>Silent renew</title></head>
       <body>
         <script>
-          window.parent.postMessage(
-            { source: "oidc-client", url: window.location.href, keepOpen: false },
-            window.location.origin
-          );
+          if (window.parent !== window) {
+            window.parent.postMessage(
+              { source: "oidc-client", url: window.location.href, keepOpen: false },
+              window.location.origin
+            );
+          } else {
+            var target = new URL(".", window.location.href);
+            try {
+              var back = new URL(new URLSearchParams(window.location.search).get("state"));
+              if (back.origin === window.location.origin) {
+                target = back;
+              }
+            } catch (e) {}
+            window.location.replace(target.href);
+          }
         </script>
       </body>
     </html>
