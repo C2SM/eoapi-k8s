@@ -20,9 +20,8 @@ Map tiles without a gate session get a 401 instead of a login redirect
 (`api_routes`): every redirect leaves a CSRF cookie behind, and a map's worth
 of them made `/browser` answer `400 Request Header Or Cookie Too Large`.
 
-**Status: live** on eoapi-dev since 2026-10-30 (`v1.3.0-prometheus`). Authelia
-stays deployed alongside, unreferenced and untouched, until it is retired (see
-[Notes](#notes)) - so [Roll back](#roll-back) remains possible.
+**Status: live** on eoapi-dev since 2026-10-30 (`v1.3.0-prometheus`), which
+also retired Authelia - see [Roll back](#roll-back).
 
 ## Configuration
 
@@ -82,12 +81,14 @@ login (the `AuthSuccess` and `custom_filters` log lines show them).
 | Client | URI | for | registered |
 |---|---|---|---|
 | `prometheus-tds` | `https://prometheus-dev.c2sm-tds.c2sm.cscs.ch/oauth2/callback` | the gate | yes, 2026-10-29 |
-| `prometheus-tds` | `http://localhost:8765/callback` | `inspect-claims.py` | no |
 | `prometheus-tds-web` | `https://prometheus-dev.c2sm-tds.c2sm.cscs.ch/browser/auth`, `…/browser/silent-renew.html` | stac-browser | yes, 2026-10-29 |
 | `prometheus-tds-web` | `https://narthex-prometheus-dev.c2sm-tds.c2sm.cscs.ch/auth/callback` | narthex | yes, 2026-10-29 |
 
-No post-logout redirect URI is registered, so logging out ends on Keycloak's
-own page rather than back in the app.
+No post-logout redirect URI is registered, and none is needed: Keycloak
+accepts a client's redirect URIs as post-logout ones and passes `state` back,
+so the browser's logout returns to `/browser/silent-renew.html?state=<page>`,
+which forwards to that page (`browser.oidcLogoutUrl` in
+`../values-cscs-dev-auth-keycloak.yaml`).
 
 Check one without logging in - Keycloak answers an unregistered one with
 `Invalid parameter: redirect_uri`:
@@ -132,20 +133,16 @@ launcher, so it has none.
   and the eobs-lab uenv (`NARTHEX_TAG` in software-stack-recipes'
   `recipes/eobs-lab/`). An older frontend ignores the field, and an older
   launcher the extra query argument. Tested on jupyter-santis 2026-10-30.
-- **Never on the Authelia deployment.** Unset, the notebooks fall back to
-  `narthex-python-client`, the Authelia client: right under Authelia, a failed
-  login under Keycloak, so the field is required. The client ID and the issuer
-  must switch together, which they do: the chart does not render without the
-  Keycloak overlay, and [Roll back](#roll-back) reinstalls
-  `v1.2.1-prometheus`, which has no `stacOidcClientId`.
+- **Required.** Unset, the notebooks fall back to `narthex-python-client`,
+  the retired Authelia client, and their login fails.
 
 ## Network
 
 oauth2-proxy (discovery at startup, token redemption), stac-auth-proxy
 (discovery, JWKS) and narthex-backend (JWKS) all need c2sm-tds →
 `auth.cscs.ch:443`. CSCS's firewall blocked it (148.187.144.0/24, checked
-2026-10-06) until CSCS opened it, by 2026-10-07. Step 1 of
-[Switching over from Authelia](#switching-over-from-authelia) checks it.
+2026-10-06) until CSCS opened it, by 2026-10-07. Step 1 of [Deploy](#deploy)
+checks it.
 
 Browsers need it too. It answered from one outside network that day and timed
 out from another; where it does not, tunnel through a login node:
@@ -154,8 +151,16 @@ out from another; where it does not, tunnel through a login node:
 ssh -N -D 1080 -J $USER@ela.cscs.ch $USER@santis.alps.cscs.ch &
 ```
 
-and use a throwaway Firefox profile with SOCKS5 `127.0.0.1:1080` and remote
-DNS (see [Inspect claims](#inspect-claims)).
+and a throwaway Firefox profile that uses it, with remote DNS:
+
+```bash
+mkdir -p /tmp/kc-ff
+printf '%s\n' 'user_pref("network.proxy.type", 1);' \
+  'user_pref("network.proxy.socks", "127.0.0.1");' \
+  'user_pref("network.proxy.socks_port", 1080);' \
+  'user_pref("network.proxy.socks_remote_dns", true);' > /tmp/kc-ff/user.js
+firefox --no-remote --profile /tmp/kc-ff https://prometheus-dev.c2sm-tds.c2sm.cscs.ch/
+```
 
 ## Secret
 
@@ -171,12 +176,12 @@ kubectl -n eoapi-dev create secret generic oauth2-proxy-keycloak-secret \
   --from-literal=cookie-secret="$(openssl rand -base64 32 | tr -- '+/' '-_')"
 ```
 
-## Switching over from Authelia
+## Deploy
 
-How the live site was moved on 2026-10-30, and how to move it again after a
-[Roll back](#roll-back). Order matters: everything the live site depends on
-changes only in step 4, and only once oauth2-proxy has proven it can reach
-Keycloak.
+The order for a first install, or after the gate was removed: everything the
+live site depends on changes only in step 4, and only once oauth2-proxy has
+proven it can reach Keycloak. Later upgrades are step 4 alone, plus
+`kubectl apply -f deploy/cscs/auth-keycloak/` when this directory changes.
 
 Deploy from a commit, never from a dirty tree: `gitSha` labels the release
 with `HEAD`, and uncommitted changes follow `git switch`, so a later redeploy
@@ -196,7 +201,8 @@ helm -n eoapi-dev history eoapi --max 1
 kubectl apply -f deploy/cscs/auth-keycloak/
 kubectl -n eoapi-dev rollout status deploy/eoapi-dev-oauth2-proxy --timeout=120s
 #    Not ready -> `kubectl -n eoapi-dev logs deploy/eoapi-dev-oauth2-proxy`,
-#    then remove it as in "Roll back" step 2. The live site is untouched.
+#    then remove it with the `delete` commands under Roll back. The live
+#    site is untouched.
 
 # 4. Switch the release over.
 helm upgrade --install eoapi ./charts/eoapi -n eoapi-dev \
@@ -209,12 +215,7 @@ kubectl -n eoapi-dev exec deploy/eoapi-stac-auth-proxy -- \
   grep -c prometheus_all /app/src/stac_auth_proxy/custom_filters.py   # >0
 ```
 
-Not applied, deliberately: `kubectl apply -f deploy/cscs/auth-authelia/` (gone
-since `v1.3.0-prometheus`; Authelia keeps running, unreferenced) and nothing
-in `narthex-ingress.yaml` or `traefik-ipallowlist.yaml` differs from
-`v1.2.1-prometheus`.
-
-The eoAPI ingress middleware chain becomes:
+The eoAPI ingress middleware chain is:
 
 ```text
 eoapi-dev-eoapi-dev-ipallowlist@kubernetescrd,
@@ -252,81 +253,31 @@ shows the gate session's user, email and groups.
    line shows which form the groups arrived in.
 2. **Anonymous `/stac`.** `curl -s https://prometheus-dev.c2sm-tds.c2sm.cscs.ch/stac/collections | jq '.collections[].id'`
    returns the public collection only.
-3. **`/stac` with a user token** - stands in for the browser login:
-
-   ```bash
-   deploy/cscs/auth-keycloak/inspect-claims.py --env-file .keycloak_prometheus-tds.env \
-     --socks 127.0.0.1:1080 --save-token /tmp/kc-token
-   curl -s -H "Authorization: Bearer $(cat /tmp/kc-token)" \
-     https://prometheus-dev.c2sm-tds.c2sm.cscs.ch/stac/collections | jq '.collections[].id'
-   ```
-
-   and the matching `custom_filters` log line. The token lives 300s.
-4. **stac-browser login.** "Log in" on a catalog page: CSCS login, back on the
+3. **stac-browser login.** "Log in" on a catalog page: CSCS login, back on the
    same page, restricted collections now listed. The `custom_filters` line for
    that user must show the `prometheus_*` groups - `roles=[]` means
    `prometheus-tds-web` tokens lack `groups`, which CSCS has to add.
-5. **narthex.** Log in to `https://narthex-prometheus-dev.c2sm-tds.c2sm.cscs.ch`,
+4. **narthex.** Log in to `https://narthex-prometheus-dev.c2sm-tds.c2sm.cscs.ch`,
    and save an item from stac-browser with the SaveToNarthex widget.
 
 ## Roll back
 
-Back to Authelia: `v1.2.1-prometheus` is the last Authelia release (Helm
-revision 83, live until 2026-10-30). Rolling back is the release first, then
-the objects the Keycloak switch added - the reverse order would leave the
-ingress pointing at a deleted middleware, which drops every route.
+Between Keycloak releases: `helm -n eoapi-dev rollback eoapi <revision>`. The
+gate in this directory is applied with kubectl, not part of the release.
+
+Authelia was retired with `v1.3.0-prometheus` on 2026-10-30: its Deployment,
+Redis, PostgresCluster and Secret are deleted. `v1.2.1-prometheus` (Helm
+revision 83) is the last release that used it. Going back means recreating
+Authelia from that tag's `deploy/cscs/auth-authelia/` - its secrets survive
+only in the gitignored `.authelia_*.env` files - deploying that tag, and then
+removing the gate (release first, gate second: the reverse leaves the ingress
+pointing at a deleted middleware, which drops every route):
 
 ```bash
-# 1. The release - either of:
-helm -n eoapi-dev rollback eoapi 83
-#    or:
-git switch --detach v1.2.1-prometheus
-git status --short deploy charts      # must print nothing
-helm upgrade --install eoapi ./charts/eoapi -n eoapi-dev --create-namespace \
-  -f deploy/cscs/values-cscs-dev.yaml \
-  -f deploy/cscs/values-cscs-dev-stac-auth-proxy.yaml \
-  -f deploy/cscs/values-cscs-dev-auth-authelia.yaml \
-  --set gitSha=$(git rev-parse HEAD | cut -c1-10)
-
-# 2. What the Keycloak switch added. Redeploying the release does not remove it.
 kubectl -n eoapi-dev delete deploy,svc,ingress,configmap,middleware.traefik.io \
   -l app.kubernetes.io/part-of=eoapi-dev-auth-keycloak
 kubectl -n eoapi-dev delete secret oauth2-proxy-keycloak-secret
-
-# 3. Check: the chain names authelia-forwardauth again, and the filters are back.
-kubectl -n eoapi-dev get ingress eoapi-ingress \
-  -o jsonpath='{.metadata.annotations.traefik\.ingress\.kubernetes\.io/router\.middlewares}'
-kubectl -n eoapi-dev exec deploy/eoapi-stac-auth-proxy -- \
-  grep -c /eoapi-admin /app/src/stac_auth_proxy/custom_filters.py   # >0
 ```
-
-Nothing else needs restoring: Authelia, its database and Redis were never
-touched, narthex keys named lists by `preferred_username` under both, and
-oauth2-proxy keeps no state. Browsers may hold a stale
-`__Secure-eoapi-dev-oauth2` cookie, which nothing reads after the rollback.
-
-## Inspect claims
-
-`inspect-claims.py` logs in (device grant, else authorization code), prints the
-decoded ID token, access token and userinfo, and where each claim matching
-`--match` (default `prometheus_`) turned up. Standard library only, Python
-3.6+.
-
-```bash
-mkdir -p /tmp/kc-ff
-printf '%s\n' 'user_pref("network.proxy.type", 1);' \
-  'user_pref("network.proxy.socks", "127.0.0.1");' \
-  'user_pref("network.proxy.socks_port", 1080);' \
-  'user_pref("network.proxy.socks_remote_dns", true);' > /tmp/kc-ff/user.js
-
-BROWSER="firefox --no-remote --profile /tmp/kc-ff %s" \
-  deploy/cscs/auth-keycloak/inspect-claims.py --env-file .keycloak_prometheus-tds.env \
-  --socks 127.0.0.1:1080
-```
-
-It needs `http://localhost:8765/callback` registered; with only another
-redirect URI, pass `--flow code --redirect-uri <it>` and paste the URL the
-browser lands on.
 
 ## Notes
 
@@ -345,9 +296,3 @@ browser lands on.
   follows this change on its own. Its client is the launch config's
   `stacOidcClientId`, since it uses the device grant, which is disabled on
   `prometheus-tds` - see [Notebook clients](#notebook-clients).
-- **Retiring Authelia** (still deployed, unreferenced) ends the rollback:
-  `git archive v1.2.1-prometheus deploy/cscs/auth-authelia | tar -x -C /tmp`, then
-  `kubectl delete -f /tmp/deploy/cscs/auth-authelia/` and
-  `kubectl -n eoapi-dev delete secret authelia-secret`. That drops its
-  PostgresCluster and Redis PVC, neither of which holds anything needed:
-  narthex owns named lists by `preferred_username`, not by Authelia's `sub`.

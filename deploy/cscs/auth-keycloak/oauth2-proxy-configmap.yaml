@@ -69,8 +69,8 @@ data:
     cookie_domains = ["prometheus-dev.c2sm-tds.c2sm.cscs.ch"]
     # The post-login redirect is the absolute URL of the original request.
     whitelist_domains = ["prometheus-dev.c2sm-tds.c2sm.cscs.ch"]
-    # A session is invalid once its access token expires, and the TDS realm's
-    # access tokens lived 300s - check prod's with inspect-claims.py.
+    # A session is invalid once its access token expires, and the realm's
+    # access tokens live 300s (a gate session's created/expires, 2026-10-30).
     # Refreshing also ends the gate's session once the SSO session has ended.
     cookie_refresh = "4m"
     # A page of map tiles starts one login flow per tile; a shared CSRF
