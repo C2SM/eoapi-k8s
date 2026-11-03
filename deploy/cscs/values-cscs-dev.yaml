@@ -369,6 +369,13 @@ postgrescluster:
       process-max: "4"
       archive-async: "y"
       archive-push-queue-max: 64GiB
+      # Expiring a backup set deletes its files 1000 per S3 request, and RGW
+      # takes minutes per request on files that large; it also closes any
+      # request at 300s, after which pgBackRest resends it. At the default 60s
+      # every expire after a full failed, and each failure re-ran the backup Job.
+      io-timeout: "600"
+      # The backup Job's log, otherwise warnings only, then shows each step.
+      log-level-console: info
     repos:
       - name: repo1
         s3:
@@ -386,6 +393,11 @@ postgrescluster:
           # 1GB forced a checkpoint every ~8s during bulk imports. Costs at
           # most 16GB of pg_wal while WAL archiving keeps up.
           max_wal_size: 16GB
+          # Imports wrote 7.6TB of WAL in a week, mostly full-page images
+          # (1.04 billion). Compressing them shrinks WAL and so the archive
+          # objects pgBackRest pushes to S3 and later has to expire. Applied
+          # on a reload.
+          wal_compression: zstd
           # pypgstac's loader plans SELECT * FROM items for every chunk, which
           # locks all partitions and their indexes (~3200 locks at 635
           # partitions) until the chunk commits. At the default 64, six
