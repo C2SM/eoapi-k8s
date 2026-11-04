@@ -9,7 +9,9 @@ ingress:
     cert-manager.io/cluster-issuer: "letsencrypt-http01-traefik"
     traefik.ingress.kubernetes.io/router.entrypoints: "websecure"
     traefik.ingress.kubernetes.io/router.tls: "true"
-    traefik.ingress.kubernetes.io/router.middlewares: "eoapi-dev-eoapi-strip-prefix-middleware@kubernetescrd,eoapi-dev-eoapi-dev-ipallowlist@kubernetescrd"
+    # The chart appends its own strip-prefix middleware after these on the API
+    # ingress; the browser ingress gets these alone.
+    traefik.ingress.kubernetes.io/router.middlewares: "eoapi-dev-eoapi-dev-ipallowlist@kubernetescrd"
   tls:
     enabled: true
     secretName: "eoapi-dev-tls"
@@ -415,6 +417,10 @@ pgstacBootstrap:
     # eoapi-stac (~20 connections at rest; their pool ceilings add up to 102).
     # With eoapi and eoapi-ingest both at their caps, the APIs still have 27.
     # Both extra roles use eoapi's password (from the eoapi-pguser-eoapi Secret).
+    # The chart's default runs a database-wide ANALYZE after every install and
+    # upgrade, and Helm waits for it. Autovacuum already analyzes the tables
+    # imports change; keep deploys from paying for all of them.
+    analyze: "off"
     userConnectionLimit: 30
     extraUsers:
       - name: eoapi-ingest

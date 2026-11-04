@@ -70,10 +70,12 @@ narthex-frontend:
   logoutUrl: *logoutUrl
 
 # oauth2-proxy's ForwardAuth gate on /raster, /vector and /multidim. It must
-# precede strip-prefix, since it matches its skip routes on the full path.
+# precede strip-prefix, since it matches its skip routes on the full path; the
+# chart appends its strip-prefix middleware after these on the API ingress
+# and leaves it off the browser ingress.
 # References are <namespace>-<name>@kubernetescrd; a wrong name silently drops
 # the whole router instead of failing, so check the rendered annotation with
 # `helm template ... | grep router.middlewares`.
 ingress:
   annotations:
-    traefik.ingress.kubernetes.io/router.middlewares: "eoapi-dev-eoapi-dev-ipallowlist@kubernetescrd,eoapi-dev-eoapi-dev-oauth-forwardauth@kubernetescrd,eoapi-dev-eoapi-strip-prefix-middleware@kubernetescrd"
+    traefik.ingress.kubernetes.io/router.middlewares: "eoapi-dev-eoapi-dev-ipallowlist@kubernetescrd,eoapi-dev-eoapi-dev-oauth-forwardauth@kubernetescrd"
