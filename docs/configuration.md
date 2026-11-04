@@ -95,7 +95,7 @@ Configure via `pgstacBootstrap.settings.pgstacSettings`:
 |:--------------|:----------------|:------------|:-----------|
 | `queue_timeout` | Timeout for queued queries | "10 minutes" | PostgreSQL interval |
 | `use_queue` | Enable query queue mechanism | "false" | boolean string |
-| `update_collection_extent` | Auto-update collection extents | "true" | boolean string |
+| `update_collection_extent` | Update extents on item writes, never, or via the maintenance CronJob | "true" | "true", "false", "scheduled" |
 
 ### Context Settings
 
@@ -121,13 +121,15 @@ CronJobs are conditionally created based on PgSTAC settings:
 - `queueProcessor.schedule`: "0 * * * *" (hourly)
 - Processes queries that exceeded timeout
 
-**Extent Updater** (created when `update_collection_extent: "false"`):
-- `extentUpdater.schedule`: "0 2 * * *" (daily at 2 AM)
-- Updates collection spatial/temporal boundaries
+**Maintenance** (created when `update_collection_extent: "scheduled"` or `analyze: "scheduled"`/`"both"`):
+- `maintenance.schedule`: "0 2 * * *" (daily at 2 AM)
+- Updates collection extents, then runs `ANALYZE`
+
+`pgstacBootstrap.settings.analyze`: `"off"`, `"afterBootstrap"` (default), `"scheduled"` or `"both"`.
 
 By default, no CronJobs are created (use_queue=false, update_collection_extent=true).
 
-Both schedules are customizable using standard cron format.
+Both schedules are customizable using standard cron format. Both CronJobs also accept `activeDeadlineSeconds` and `resources`.
 
 Example configuration:
 
@@ -138,13 +140,25 @@ pgstacBootstrap:
       # Performance tuning for large datasets
       queue_timeout: "20 minutes"
       use_queue: "true"
-      update_collection_extent: "false"
+      update_collection_extent: "scheduled"
 
       # Opt in to match counts if clients need them (adds DB load)
       context: "auto"
       context_estimated_count: "50000"
       context_estimated_cost: "75000"
       context_stats_ttl: "12 hours"
+```
+
+#### Database-level `statement_timeout`
+
+`pgstacBootstrap.settings.extraEnv` is added to the pgstac Jobs and CronJobs, not to the API services. Use it to lift a database-level timeout for maintenance only:
+
+```yaml
+pgstacBootstrap:
+  settings:
+    extraEnv:
+      - name: PGOPTIONS
+        value: "-c statement_timeout=0"
 ```
 
 ### Queryables Configuration
@@ -312,6 +326,19 @@ raster:
       cpu: 75
       requestRate: "100000m"
 ```
+
+### Raster Alternate Assets
+
+Some STAC catalogs publish cloud-optimized asset hrefs under an `alternate` key (see the [STAC Alternate Assets extension](https://github.com/stac-extensions/alternate-assets)) instead of, or in addition to, an asset's main `href` (e.g. a public HTTPS href alongside an `alternate.s3` href for direct/requester-pays S3 access). titiler-pgstac's underlying reader ([rio-tiler](https://github.com/cogeotiff/rio-tiler)) can be configured to prefer one of these alternate hrefs, when present, over the main href via the `RIO_TILER_STAC_ALTERNATE_KEY` environment variable, set through `raster.settings.envVars`:
+
+```yaml
+raster:
+  settings:
+    envVars:
+      RIO_TILER_STAC_ALTERNATE_KEY: "s3"
+```
+
+Assets without a matching `alternate` entry keep using their main `href`.
 
 ## STAC Browser
 

@@ -27,16 +27,23 @@ spec:
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
       {{- end }}
+      {{- with .Values.browser.settings.podSecurityContext }}
+      securityContext:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       containers:
         - name: browser
           image: {{ include "eoapi.containerImage" .Values.browser.image }}
           imagePullPolicy: {{ .Values.browser.image.pullPolicy | default "IfNotPresent" }}
+          {{- with .Values.browser.settings.securityContext }}
+          securityContext:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
           ports:
           - containerPort: 8080
           env:
-            {{- $browserPath := include "eoapi.browserIngressPath" . }}
             - name: SB_pathPrefix
-              value: {{ ternary "/" (printf "%s/" $browserPath) (eq $browserPath "/") | quote }}
+              value: {{ include "eoapi.browserPathPrefix" . | quote }}
             - name: SB_catalogUrl
               value: {{ .Values.browser.catalogUrl | default (printf "%s://%s%s" (ternary "https" "http" .Values.ingress.tls.enabled) .Values.ingress.host .Values.stac.ingress.path) | quote }}
             {{- if .Values.browser.catalogTitle }}
@@ -64,9 +71,9 @@ spec:
                   {{- end }}
                   "oidcConfig": {
                     "client_id": "{{ .Values.browser.oidcClientId | default "test-client" }}",
-                    "redirect_uri": "{{ if .Values.ingress.tls.enabled }}https{{ else }}http{{ end }}://{{ .Values.ingress.host }}{{ .Values.browser.ingress.path | default "/browser" | trimSuffix "/" }}/auth",
+                    "redirect_uri": "{{ if .Values.ingress.tls.enabled }}https{{ else }}http{{ end }}://{{ .Values.ingress.host }}{{ trimSuffix "/" (((.Values.browser).ingress).path | default "/browser") }}/auth",
                     "scope": "{{ .Values.browser.oidcScope | default "openid" }}"{{ if .Values.browser.oidcSilentRenew }},
-                    "silent_redirect_uri": "{{ if .Values.ingress.tls.enabled }}https{{ else }}http{{ end }}://{{ .Values.ingress.host }}{{ .Values.browser.ingress.path | default "/browser" | trimSuffix "/" }}/silent-renew.html"{{ end }}
+                    "silent_redirect_uri": "{{ if .Values.ingress.tls.enabled }}https{{ else }}http{{ end }}://{{ .Values.ingress.host }}{{ trimSuffix "/" (((.Values.browser).ingress).path | default "/browser") }}/silent-renew.html"{{ end }}
                   }
                 }
               {{- end }}

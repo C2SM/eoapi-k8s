@@ -31,6 +31,11 @@ spec:
     metadata:
       annotations:
         checksum/config: {{ include (print $.Template.BasePath "/services/vector/configmap.yaml") . | sha256sum }}
+        {{- if .Values.vector.metrics.enabled }}
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "{{ .Values.service.port }}"
+        prometheus.io/path: "/metrics"
+        {{- end }}
       labels:
         {{- include "eoapi.selectorLabels" . | nindent 8 }}
         app.kubernetes.io/component: vector
@@ -89,9 +94,17 @@ spec:
           - containerPort: {{ .Values.service.port }}
         resources:
           {{- toYaml .Values.vector.settings.resources | nindent 10 }}
+        {{- with .Values.vector.settings.securityContext }}
+        securityContext:
+          {{- toYaml . | nindent 10 }}
+        {{- end }}
         env:
           {{- include "eoapi.postgresqlEnv" (dict "root" . "service" "vector") | nindent 10 }}
           {{- include "eoapi.commonEnvVars" (dict "service" "vector" "root" .) | nindent 10 }}
+          {{- if .Values.vector.metrics.enabled }}
+          - name: TIPG_ENABLE_METRICS
+            value: "true"
+          {{- end }}
         envFrom:
           - configMapRef:
               name: {{ .Release.Name }}-vector-envvar-configmap
@@ -108,6 +121,10 @@ spec:
         {{- toYaml . | nindent 8 }}
         {{- end }}
       serviceAccountName: {{ include "eoapi.serviceAccountName" . }}
+      {{- with .Values.vector.settings.podSecurityContext }}
+      securityContext:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       {{- with .Values.vector.settings.affinity }}
       affinity:
         {{- toYaml . | nindent 8 }}

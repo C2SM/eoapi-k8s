@@ -31,6 +31,11 @@ spec:
     metadata:
       annotations:
         checksum/config: {{ include (print $.Template.BasePath "/services/raster/configmap.yaml") . | sha256sum }}
+        {{- if .Values.raster.metrics.enabled }}
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "{{ .Values.service.port }}"
+        prometheus.io/path: "/metrics"
+        {{- end }}
       labels:
         {{- include "eoapi.selectorLabels" . | nindent 8 }}
         app.kubernetes.io/component: raster
@@ -89,9 +94,17 @@ spec:
           - containerPort: {{ .Values.service.port }}
         resources:
           {{- toYaml .Values.raster.settings.resources | nindent 10 }}
+        {{- with .Values.raster.settings.securityContext }}
+        securityContext:
+          {{- toYaml . | nindent 10 }}
+        {{- end }}
         env:
           {{- include "eoapi.postgresqlEnv" (dict "root" . "service" "raster") | nindent 10 }}
           {{- include "eoapi.commonEnvVars" (dict "service" "raster" "root" .) | nindent 10 }}
+          {{- if .Values.raster.metrics.enabled }}
+          - name: TITILER_PGSTAC_API_METRICS_ENABLED
+            value: "true"
+          {{- end }}
         envFrom:
           - configMapRef:
               name: {{ .Release.Name }}-raster-envvar-configmap
@@ -108,6 +121,10 @@ spec:
         {{- toYaml . | nindent 8 }}
         {{- end }}
       serviceAccountName: {{ include "eoapi.serviceAccountName" . }}
+      {{- with .Values.raster.settings.podSecurityContext }}
+      securityContext:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       {{- with .Values.raster.settings.affinity }}
       affinity:
         {{- toYaml . | nindent 8 }}

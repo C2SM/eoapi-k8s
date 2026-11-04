@@ -20,6 +20,16 @@ postgrescluster, the service connects as <service>.settings.dbUser when set.
 {{- end }}
 
 {{/*
+Environment for pgstacBootstrap Jobs/CronJobs: PostgreSQL env plus settings.extraEnv
+*/}}
+{{- define "eoapi.pgstacBootstrapEnv" -}}
+{{- include "eoapi.postgresqlEnv" . }}
+{{- with .Values.pgstacBootstrap.settings.extraEnv }}
+{{ toYaml . }}
+{{- end }}
+{{- end }}
+
+{{/*
 PostgreSQL cluster secrets. A non-empty dbUser replaces the Secret's user; it
 must share that user's password (see pgstacBootstrap.settings.extraUsers).
 */}}

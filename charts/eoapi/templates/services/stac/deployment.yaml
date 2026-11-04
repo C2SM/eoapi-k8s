@@ -31,6 +31,11 @@ spec:
     metadata:
       annotations:
         checksum/config: {{ include (print $.Template.BasePath "/services/stac/configmap.yaml") . | sha256sum }}
+        {{- if .Values.stac.metrics.enabled }}
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "{{ .Values.service.port }}"
+        prometheus.io/path: "/_mgmt/metrics"
+        {{- end }}
       labels:
         {{- include "eoapi.selectorLabels" . | nindent 8 }}
         app.kubernetes.io/component: stac
@@ -93,9 +98,17 @@ spec:
           - containerPort: {{ .Values.service.port }}
         resources:
           {{- toYaml .Values.stac.settings.resources | nindent 10 }}
+        {{- with .Values.stac.settings.securityContext }}
+        securityContext:
+          {{- toYaml . | nindent 10 }}
+        {{- end }}
         env:
           {{- include "eoapi.postgresqlEnv" (dict "root" . "service" "stac") | nindent 10 }}
           {{- include "eoapi.commonEnvVars" (dict "service" "stac" "root" .) | nindent 10 }}
+          {{- if .Values.stac.metrics.enabled }}
+          - name: ENABLE_METRICS
+            value: "true"
+          {{- end }}
         envFrom:
           - configMapRef:
               name: {{ .Release.Name }}-stac-envvar-configmap
@@ -112,6 +125,10 @@ spec:
         {{- toYaml . | nindent 8 }}
         {{- end }}
       serviceAccountName: {{ include "eoapi.serviceAccountName" . }}
+      {{- with .Values.stac.settings.podSecurityContext }}
+      securityContext:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       {{- with .Values.stac.settings.affinity }}
       affinity:
         {{- toYaml . | nindent 8 }}

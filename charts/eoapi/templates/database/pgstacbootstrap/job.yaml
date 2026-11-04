@@ -67,15 +67,23 @@ spec:
               echo "PgSTAC migration and setup complete"
           resources:
             {{- toYaml .Values.pgstacBootstrap.settings.resources | nindent 12 }}
+          {{- with .Values.pgstacBootstrap.settings.securityContext }}
+          securityContext:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
           volumeMounts:
             - mountPath: /opt/settings
               name: {{ .Release.Name }}-pgstac-settings-volume
           env:
-            {{- include "eoapi.postgresqlEnv" . | nindent 12 }}
+            {{- include "eoapi.pgstacBootstrapEnv" . | nindent 12 }}
       volumes:
         - name: {{ .Release.Name }}-pgstac-settings-volume
           configMap:
             name: {{ .Release.Name }}-pgstac-settings-config
+      {{- with .Values.pgstacBootstrap.settings.podSecurityContext }}
+      securityContext:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       {{- with .Values.pgstacBootstrap.settings.affinity }}
       affinity:
         {{- toYaml . | nindent 8 }}
@@ -134,13 +142,17 @@ spec:
               echo "Sample data loading complete"
           resources:
             {{- toYaml .Values.pgstacBootstrap.settings.resources | nindent 12 }}
+          {{- with .Values.pgstacBootstrap.settings.securityContext }}
+          securityContext:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
           volumeMounts:
             - mountPath: /opt/sql
               name: {{ .Release.Name }}-initdb-sql-volume
             - mountPath: /opt/data
               name: {{ .Release.Name }}-initdb-json-volume
           env:
-            {{- include "eoapi.postgresqlEnv" . | nindent 12 }}
+            {{- include "eoapi.pgstacBootstrapEnv" . | nindent 12 }}
       volumes:
         - name: {{ .Release.Name }}-initdb-sql-volume
           configMap:
@@ -148,6 +160,10 @@ spec:
         - name: {{ .Release.Name }}-initdb-json-volume
           configMap:
             name: {{ .Release.Name }}-initdb-json-config
+      {{- with .Values.pgstacBootstrap.settings.podSecurityContext }}
+      securityContext:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       {{- with .Values.pgstacBootstrap.settings.affinity }}
       affinity:
         {{- toYaml . | nindent 8 }}
@@ -222,6 +238,10 @@ spec:
               echo "Queryables loading complete"
           resources:
             {{- toYaml .Values.pgstacBootstrap.settings.resources | nindent 12 }}
+          {{- with .Values.pgstacBootstrap.settings.securityContext }}
+          securityContext:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
           volumeMounts:
             {{- range $idx, $config := .Values.pgstacBootstrap.settings.queryables }}
             {{- if and $config.file (typeIs "string" $config.file) }}
@@ -235,7 +255,7 @@ spec:
             {{- end }}
             {{- end }}
           env:
-            {{- include "eoapi.postgresqlEnv" . | nindent 12 }}
+            {{- include "eoapi.pgstacBootstrapEnv" . | nindent 12 }}
       volumes:
         {{- $hasFileBasedQueryables := false }}
         {{- range $config := .Values.pgstacBootstrap.settings.queryables }}
@@ -258,6 +278,10 @@ spec:
                 path: {{ $config.configMapRef.key }}
           {{- end }}
         {{- end }}
+      {{- with .Values.pgstacBootstrap.settings.podSecurityContext }}
+      securityContext:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       {{- with .Values.pgstacBootstrap.settings.affinity }}
       affinity:
         {{- toYaml . | nindent 8 }}
@@ -267,4 +291,68 @@ spec:
         {{- toYaml . | nindent 8 }}
       {{- end }}
   backoffLimit: 3
+{{- end }}
+
+{{- if and .Values.pgstacBootstrap.enabled (has .Values.pgstacBootstrap.settings.analyze (list "afterBootstrap" "both")) }}
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ .Release.Name }}-pgstac-analyze
+  labels:
+    app: {{ .Release.Name }}-pgstac-analyze
+  {{- with .Values.pgstacBootstrap.jobs.pgstacAnalyze.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  template:
+    metadata:
+      labels:
+        app: {{ .Release.Name }}-pgstac-analyze
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: pgstac-analyze
+          image: {{ include "eoapi.containerImage" .Values.pgstacBootstrap.image }}
+          imagePullPolicy: {{ .Values.pgstacBootstrap.image.pullPolicy | default "IfNotPresent" }}
+          command:
+            - "/bin/sh"
+            - "-c"
+          args:
+            - |
+              # Exit immediately if a command exits with a non-zero status
+              set -e
+
+              # Database connection configured through standard PG* environment variables
+              # Environment variables are already set by the container
+
+              echo "Waiting for database to be ready..."
+              pypgstac pgready
+
+              echo "Analyzing database..."
+              psql -c "ANALYZE;"
+
+              echo "Analyze complete"
+          resources:
+            {{- toYaml .Values.pgstacBootstrap.settings.resources | nindent 12 }}
+          {{- with .Values.pgstacBootstrap.settings.securityContext }}
+          securityContext:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          env:
+            {{- include "eoapi.pgstacBootstrapEnv" . | nindent 12 }}
+      {{- with .Values.pgstacBootstrap.settings.podSecurityContext }}
+      securityContext:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.pgstacBootstrap.settings.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.pgstacBootstrap.settings.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+  backoffLimit: 1
 {{- end }}
