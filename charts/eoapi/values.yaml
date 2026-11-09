@@ -856,7 +856,9 @@ narthex-backend:
   enabled: false
   image:
     name: ghcr.io/c2sm/narthex-backend
-    tag: "v1.0.0-alpha"
+    # From v1.2.1-beta.1 both narthex images run as non-root (backend uid
+    # 1000, frontend uid 101), and the frontend listens on 8080.
+    tag: "v1.2.1-beta.1"
     pullPolicy: IfNotPresent
   service:
     port: 8000
@@ -887,12 +889,15 @@ narthex-backend:
   settings:
     labels: {}
     resources: {}
+    securityContext: {}
+    podSecurityContext: {}
 
 narthex-frontend:
   enabled: false
   image:
     name: ghcr.io/c2sm/narthex-frontend
-    tag: "v1.0.0-alpha"
+    # Must listen on 8080 (v1.2.1-beta.1 or later); the Service targets it.
+    tag: "v1.2.1-beta.1"
     pullPolicy: IfNotPresent
   service:
     port: 80
@@ -952,6 +957,8 @@ narthex-frontend:
   settings:
     labels: {}
     resources: {}
+    securityContext: {}
+    podSecurityContext: {}
 
 docServer:
   enabled: true

@@ -1,0 +1,113 @@
+suite: narthex security context tests
+templates:
+  - templates/_helpers/core.tpl
+  - templates/_helpers/database.tpl
+  - templates/services/narthex-frontend/configmap.yaml
+  - templates/services/narthex-frontend/deployment.yaml
+  - templates/services/narthex-frontend/service.yaml
+  - templates/services/narthex-backend/deployment.yaml
+  - templates/database/narthex-superuser-initdb.yaml
+set:
+  narthex-backend.enabled: true
+  narthex-frontend.enabled: true
+tests:
+  - it: narthex backend securityContext and podSecurityContext are absent by default
+    template: templates/services/narthex-backend/deployment.yaml
+    asserts:
+      - notExists:
+          path: spec.template.spec.containers[0].securityContext
+      - notExists:
+          path: spec.template.spec.securityContext
+
+  - it: narthex frontend securityContext and podSecurityContext are absent by default
+    template: templates/services/narthex-frontend/deployment.yaml
+    asserts:
+      - notExists:
+          path: spec.template.spec.containers[0].securityContext
+      - notExists:
+          path: spec.template.spec.securityContext
+
+  - it: narthex backend accepts a hardened securityContext and podSecurityContext
+    set:
+      narthex-backend.settings.podSecurityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      narthex-backend.settings.securityContext:
+        allowPrivilegeEscalation: false
+        capabilities:
+          drop: [ALL]
+    template: templates/services/narthex-backend/deployment.yaml
+    asserts:
+      - equal:
+          path: spec.template.spec.securityContext
+          value:
+            runAsNonRoot: true
+            runAsUser: 1000
+            seccompProfile:
+              type: RuntimeDefault
+      - equal:
+          path: spec.template.spec.containers[0].securityContext
+          value:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: [ALL]
+
+  - it: narthex frontend accepts a hardened securityContext and podSecurityContext
+    set:
+      narthex-frontend.settings.podSecurityContext:
+        runAsNonRoot: true
+        runAsUser: 101
+      narthex-frontend.settings.securityContext:
+        allowPrivilegeEscalation: false
+    template: templates/services/narthex-frontend/deployment.yaml
+    asserts:
+      - equal:
+          path: spec.template.spec.securityContext
+          value:
+            runAsNonRoot: true
+            runAsUser: 101
+      - equal:
+          path: spec.template.spec.containers[0].securityContext
+          value:
+            allowPrivilegeEscalation: false
+
+  # The image listens on 8080 from v1.2.1-beta.1 on, so it can run without
+  # NET_BIND_SERVICE; the Service keeps its own port.
+  - it: narthex frontend listens on 8080 behind its Service port
+    template: templates/services/narthex-frontend/deployment.yaml
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].ports[0].containerPort
+          value: 8080
+
+  - it: narthex frontend Service targets 8080
+    template: templates/services/narthex-frontend/service.yaml
+    asserts:
+      - equal:
+          path: spec.ports[0].port
+          value: 80
+      - equal:
+          path: spec.ports[0].targetPort
+          value: 8080
+
+  - it: narthex superuser init job runs as the postgres image's own non-root user
+    set:
+      postgrescluster-narthex.enabled: true
+    template: templates/database/narthex-superuser-initdb.yaml
+    asserts:
+      - equal:
+          path: spec.template.spec.securityContext
+          value:
+            runAsNonRoot: true
+            runAsUser: 70
+            runAsGroup: 70
+            seccompProfile:
+              type: RuntimeDefault
+      - equal:
+          path: spec.template.spec.containers[0].securityContext
+          value:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: [ALL]

@@ -30,6 +30,10 @@ spec:
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
       {{- end }}
+      {{- with $nf.settings.podSecurityContext }}
+      securityContext:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       volumes:
         - name: launch-configs
           configMap:
@@ -38,8 +42,12 @@ spec:
         - name: narthex-frontend
           image: {{ include "eoapi.containerImage" $nf.image }}
           imagePullPolicy: {{ $nf.image.pullPolicy | default "IfNotPresent" }}
+          {{- with $nf.settings.securityContext }}
+          securityContext:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
           ports:
-            - containerPort: 80
+            - containerPort: 8080
           env:
             - name: NARTHEX_API_URL
               value: {{ $nf.apiUrl | quote }}

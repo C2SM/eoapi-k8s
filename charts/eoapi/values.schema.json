@@ -794,6 +794,14 @@
             "resources": {
               "type": "object",
               "description": "Resource requests and limits for this service"
+            },
+            "securityContext": {
+              "type": "object",
+              "description": "Container-level securityContext for the narthex-backend container"
+            },
+            "podSecurityContext": {
+              "type": "object",
+              "description": "Pod-level securityContext for the narthex-backend Deployment"
             }
           }
         }
@@ -927,6 +935,14 @@
             "resources": {
               "type": "object",
               "description": "Resource requests and limits for this service"
+            },
+            "securityContext": {
+              "type": "object",
+              "description": "Container-level securityContext for the narthex-frontend container"
+            },
+            "podSecurityContext": {
+              "type": "object",
+              "description": "Pod-level securityContext for the narthex-frontend Deployment"
             }
           }
         }

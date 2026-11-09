@@ -30,10 +30,18 @@ spec:
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
       {{- end }}
+      {{- with $nb.settings.podSecurityContext }}
+      securityContext:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       containers:
         - name: narthex-backend
           image: {{ include "eoapi.containerImage" $nb.image }}
           imagePullPolicy: {{ $nb.image.pullPolicy | default "IfNotPresent" }}
+          {{- with $nb.settings.securityContext }}
+          securityContext:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
           command:
             - sh
             - -c

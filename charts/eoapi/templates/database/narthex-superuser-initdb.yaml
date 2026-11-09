@@ -24,9 +24,21 @@ spec:
         app: {{ .Release.Name }}-narthex-superuser-init-db
     spec:
       restartPolicy: Never
+      # Only psql runs here, so the image's own postgres user (uid 70 in the
+      # alpine image) is enough; Pod Security "restricted" otherwise.
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 70
+        runAsGroup: 70
+        seccompProfile:
+          type: RuntimeDefault
       containers:
         - name: narthex-superuser-init-db
           image: postgres:16-alpine
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: [ALL]
           command:
             - /bin/sh
             - -c
