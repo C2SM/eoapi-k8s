@@ -121,10 +121,12 @@ spec:
           {{- toYaml . | nindent 10 }}
         {{- end }}
       volumes:
+        {{- include "eoapi.serviceAccountTokenVolume" . | nindent 8 }}
         {{- with .Values.stac.settings.extraVolumes }}
         {{- toYaml . | nindent 8 }}
         {{- end }}
       serviceAccountName: {{ include "eoapi.serviceAccountName" . }}
+      {{- include "eoapi.podAutomountServiceAccountToken" . | nindent 6 }}
       {{- with .Values.stac.settings.podSecurityContext }}
       securityContext:
         {{- toYaml . | nindent 8 }}

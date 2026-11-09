@@ -31,6 +31,7 @@ spec:
       securityContext:
         {{- toYaml . | nindent 8 }}
       {{- end }}
+      {{- include "eoapi.podAutomountServiceAccountToken" . | nindent 6 }}
       containers:
         - name: browser
           image: {{ include "eoapi.containerImage" .Values.browser.image }}

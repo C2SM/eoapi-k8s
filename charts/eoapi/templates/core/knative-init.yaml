@@ -20,6 +20,9 @@ spec:
     spec:
       restartPolicy: Never
       serviceAccountName: {{ include "eoapi.serviceAccountName" . }}
+      # Runs kubectl throughout, so it keeps its token whatever
+      # serviceAccount.automount says.
+      automountServiceAccountToken: true
       {{- with .Values.knative.jobs.init.podSecurityContext }}
       securityContext:
         {{- toYaml . | nindent 8 }}

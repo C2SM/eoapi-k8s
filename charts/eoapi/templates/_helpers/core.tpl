@@ -75,6 +75,45 @@ Create the name of the service account to use
 {{- end }}
 
 {{/*
+Pod-level token setting for the chart's pods. With serviceAccount.automount
+false no container gets a service account token, also when the pod runs as
+a pre-existing service account that automounts; the one container that
+calls the API, wait-for-pgstac-jobs, mounts its own (eoapi.serviceAccountTokenVolume).
+*/}}
+{{- define "eoapi.podAutomountServiceAccountToken" -}}
+{{- if not .Values.serviceAccount.automount }}
+automountServiceAccountToken: false
+{{- end }}
+{{- end }}
+
+{{/*
+The volume the kubelet would mount as kube-api-access-*, for the
+wait-for-pgstac-jobs init container alone when serviceAccount.automount is
+false: a bound token, the cluster CA, and the namespace kubectl defaults to.
+A list item for the pod's volumes; renders nothing otherwise.
+*/}}
+{{- define "eoapi.serviceAccountTokenVolume" -}}
+{{- if and .Values.pgstacBootstrap.enabled (not .Values.serviceAccount.automount) }}
+- name: kube-api-access
+  projected:
+    sources:
+      - serviceAccountToken:
+          path: token
+          expirationSeconds: 3607
+      - configMap:
+          name: kube-root-ca.crt
+          items:
+            - key: ca.crt
+              path: ca.crt
+      - downwardAPI:
+          items:
+            - path: namespace
+              fieldRef:
+                fieldPath: metadata.namespace
+{{- end }}
+{{- end }}
+
+{{/*
 Resolve a container image reference from an image values map.
 Uses name + tag, or name@digest when digest is set.
 */}}

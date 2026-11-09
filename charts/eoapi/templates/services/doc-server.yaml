@@ -74,6 +74,7 @@ spec:
       - name: {{ .Release.Name }}-doc-html
         configMap:
           name: {{ .Release.Name }}-doc-server-html
+      {{- include "eoapi.podAutomountServiceAccountToken" . | nindent 6 }}
       {{- if .Values.docServer.settings }}
       {{- with .Values.docServer.settings.podSecurityContext }}
       securityContext:

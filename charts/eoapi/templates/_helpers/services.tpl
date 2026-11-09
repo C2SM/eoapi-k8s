@@ -63,6 +63,13 @@ initContainers:
   securityContext:
     {{- toYaml . | nindent 4 }}
   {{- end }}
+  {{- if not .Values.serviceAccount.automount }}
+  # kubectl's in-cluster config reads the token, CA and namespace from here.
+  volumeMounts:
+  - name: kube-api-access
+    mountPath: /var/run/secrets/kubernetes.io/serviceaccount
+    readOnly: true
+  {{- end }}
   env:
   {{- include "eoapi.commonEnvVars" (dict "service" "init" "root" .) | nindent 2 }}
   resources:

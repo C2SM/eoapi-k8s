@@ -73,4 +73,5 @@ spec:
           resources:
             {{- toYaml $nf.settings.resources | nindent 12 }}
       serviceAccountName: {{ include "eoapi.serviceAccountName" . }}
+      {{- include "eoapi.podAutomountServiceAccountToken" . | nindent 6 }}
 {{- end }}
