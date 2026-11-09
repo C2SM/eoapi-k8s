@@ -20,8 +20,7 @@ Map tiles without a gate session get a 401 instead of a login redirect
 (`api_routes`): every redirect leaves a CSRF cookie behind, and a map's worth
 of them made `/browser` answer `400 Request Header Or Cookie Too Large`.
 
-**Status: live** on eoapi-dev since 2026-10-30 (`v1.3.0-prometheus`), which
-also retired Authelia - see [Roll back](#roll-back).
+**Status: live** on eoapi-dev since 2026-10-30 (`v1.3.0-prometheus`).
 
 ## Configuration
 
@@ -134,7 +133,7 @@ launcher, so it has none.
   `recipes/eobs-lab/`). An older frontend ignores the field, and an older
   launcher the extra query argument. Tested on jupyter-santis 2026-10-30.
 - **Required.** Unset, the notebooks fall back to `narthex-python-client`,
-  the retired Authelia client, and their login fails.
+  which Keycloak does not have, and their login fails.
 
 ## Network
 
@@ -265,27 +264,13 @@ shows the gate session's user, email and groups.
 Between Keycloak releases: `helm -n eoapi-dev rollback eoapi <revision>`. The
 gate in this directory is applied with kubectl, not part of the release.
 
-Authelia was retired with `v1.3.0-prometheus` on 2026-10-30: its Deployment,
-Redis, PostgresCluster and Secret are deleted. `v1.2.1-prometheus` (Helm
-revision 83) is the last release that used it. Going back means recreating
-Authelia from that tag's `deploy/cscs/auth-authelia/` - its secrets survive
-only in the gitignored `.authelia_*.env` files - deploying that tag, and then
-removing the gate (release first, gate second: the reverse leaves the ingress
-pointing at a deleted middleware, which drops every route):
-
-```bash
-kubectl -n eoapi-dev delete deploy,svc,ingress,configmap,middleware.traefik.io \
-  -l app.kubernetes.io/part-of=eoapi-dev-auth-keycloak
-kubectl -n eoapi-dev delete secret oauth2-proxy-keycloak-secret
-```
-
 ## Notes
 
 - **Logout ends the CSCS SSO session**, i.e. every CSCS app including
   jupyter-santis. The gate's own cookie outlives it until its next refresh
   (`cookie_refresh`), which then fails and sends the user back through
   Keycloak; `/oauth2/sign_out` clears it directly.
-- **The gate's cookie is bigger than Authelia's was.** It carries Keycloak's
+- **The gate's cookie is large.** It carries Keycloak's
   access (~1.7 KB), ID and refresh tokens, split across `_0`, `_1`, …
   cookies. If gated paths start answering 431 or 400, move oauth2-proxy to
   `session_store_type = "redis"`.

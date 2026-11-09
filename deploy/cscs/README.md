@@ -51,8 +51,7 @@ client. The IP allowlist stays on everything.
 
 Every IdP-facing value is in `values-cscs-dev-auth-keycloak.yaml`, endpoints
 and client ID in its `keycloak:` section; the gate's client secret is the
-`oauth2-proxy-keycloak-secret` Secret. Authelia was retired on 2026-10-30;
-`v1.2.1-prometheus` is the last release that used it.
+`oauth2-proxy-keycloak-secret` Secret.
 
 `deploy/cscs/auth-keycloak/README.md` has what is known about the realm, the
 registered redirect URIs, the network precondition, the deploy order, the logs

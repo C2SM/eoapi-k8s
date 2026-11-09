@@ -1,6 +1,6 @@
 # oauth2-proxy as the ForwardAuth gate for what has no auth of its own on the
 # eoAPI host: /raster, /vector and /multidim. Keycloak has no ForwardAuth
-# endpoint, so this is the piece that replaces Authelia's.
+# endpoint, so this gate provides one.
 #
 # The confidential prometheus-tds client: client_secret and cookie_secret come
 # from the oauth2-proxy-keycloak-secret Secret as env vars (see

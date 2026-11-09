@@ -44,7 +44,7 @@ browser:
   oidcLogoutUrl: "https://auth.cscs.ch/auth/realms/cscs/protocol/openid-connect/logout?client_id=prometheus-tds-web&post_logout_redirect_uri=https%3A%2F%2Fprometheus-dev.c2sm-tds.c2sm.cscs.ch%2Fbrowser%2Fsilent-renew.html&state={url}"
   # /browser/silent-renew.html must be a valid redirect URI on the client.
   oidcSilentRenew: true
-  # Picks up an existing CSCS session on page load, as Authelia's did. Needs
+  # Picks up an existing CSCS session on page load. Needs
   # /browser/silent-renew.html registered on the client (it is, 2026-10-30):
   # otherwise every page load stalls ~10s on it - then set this to false.
   oidcAutoSignIn: true

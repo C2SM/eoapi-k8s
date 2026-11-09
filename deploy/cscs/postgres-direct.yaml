@@ -3,7 +3,7 @@
 # enforces the source range against the client's own address.
 #
 #  - The selector must name the cluster: `role: master` alone also matches the
-#    narthex and authelia primaries, and the Service balanced across all three.
+#    narthex primary, and the Service balanced across both.
 #  - externalTrafficPolicy Local keeps the client address, so pg_stat_activity
 #    shows which santis node a connection comes from.
 #  - pg_hba allows md5 from anywhere, so the source range is the only network
