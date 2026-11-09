@@ -25,6 +25,11 @@ stac-auth-proxy:
         # the server honours `filter` there (stac-fastapi-pgstac 7.2.0 doesn't).
         COLLECTIONS_FILTER_PATH: '^(/collections|/catalogs/[^/]+/collections)(/[^/]+)?$'
         ITEMS_FILTER_PATH: '^((/catalogs/[^/]+)?/collections/[^/]+/items(/[^/]+)?|/collections/[^/]+/bulk_items|/search)$'
+    # Merged into the subchart's pod securityContext, which is non-root
+    # already; Pod Security "restricted" also wants the seccomp profile.
+    securityContext:
+        seccompProfile:
+            type: RuntimeDefault
     customFiltersFile: "data/stac-auth-proxy/custom_filters.py"
     extraVolumes:
         - name: filters

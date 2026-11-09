@@ -18,9 +18,20 @@ spec:
         app.kubernetes.io/name: oauth2-proxy
         app.kubernetes.io/part-of: eoapi-dev-auth-keycloak
     spec:
+      # Pod Security "restricted"; 65532 is the image's own nonroot user.
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        seccompProfile:
+          type: RuntimeDefault
       containers:
         - name: oauth2-proxy
           image: quay.io/oauth2-proxy/oauth2-proxy:v7.15.5
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: [ALL]
           args:
             - --config=/etc/oauth2-proxy/oauth2-proxy.cfg
           ports:

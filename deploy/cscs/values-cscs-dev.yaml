@@ -28,6 +28,20 @@ stac:
     path: "/stac"
   settings:
     dbUser: eoapi-stac
+    # Pod Security "restricted" for every pod the chart renders, here and
+    # below. runAsUser is each image's own uid, spelled out because
+    # runAsNonRoot can only check a numeric user and several images name
+    # theirs ("user", "nginx").
+    podSecurityContext: &podUid1000
+      runAsNonRoot: true
+      runAsUser: 1000
+      runAsGroup: 1000
+      seccompProfile:
+        type: RuntimeDefault
+    securityContext: &containerRestricted
+      allowPrivilegeEscalation: false
+      capabilities:
+        drop: [ALL]
     envVars:
       # /catalogs: the collection groups loaded by deploy/cscs/catalogs/.
       # Read-only - transactions stay off, so no catalog write endpoints.
@@ -52,6 +66,8 @@ raster:
     path: "/raster"
   settings:
     dbUser: eoapi-stac
+    podSecurityContext: *podUid1000
+    securityContext: *containerRestricted
 
 vector:
   enabled: true
@@ -60,6 +76,8 @@ vector:
     path: "/vector"
   settings:
     dbUser: eoapi-stac
+    podSecurityContext: *podUid1000
+    securityContext: *containerRestricted
 
 browser:
   enabled: true
@@ -76,6 +94,14 @@ browser:
     pullPolicy: Always
   imagePullSecrets:
     - name: narthex-ghcr-pull-secret
+  settings:
+    podSecurityContext: &podUid101
+      runAsNonRoot: true
+      runAsUser: 101
+      runAsGroup: 101
+      seccompProfile:
+        type: RuntimeDefault
+    securityContext: *containerRestricted
   ingress:
     enabled: true
     path: "/browser"
@@ -146,7 +172,7 @@ narthex-backend:
   # Same narthex release as narthex-frontend. Always rather than IfNotPresent:
   # narthex's pre-release tags were re-pushed in place.
   image:
-    tag: "v1.2.0"
+    tag: "v1.2.1-beta.1"
     pullPolicy: Always
   ingress:
     enabled: false
@@ -158,11 +184,14 @@ narthex-backend:
     - "https://prometheus-dev.c2sm-tds.c2sm.cscs.ch"
   imagePullSecrets:
     - name: narthex-ghcr-pull-secret
+  settings:
+    podSecurityContext: *podUid1000
+    securityContext: *containerRestricted
 
 narthex-frontend:
   enabled: true
   image:
-    tag: "v1.2.0"
+    tag: "v1.2.1-beta.1"
     pullPolicy: Always
   ingress:
     enabled: false
@@ -218,6 +247,9 @@ narthex-frontend:
         is not what you want to launch.
   imagePullSecrets:
     - name: narthex-ghcr-pull-secret
+  settings:
+    podSecurityContext: *podUid101
+    securityContext: *containerRestricted
 
 docServer:
   # Replaces the stock "This is the root path /" list. Anyone landing on
@@ -293,6 +325,9 @@ docServer:
       </main>
     </body>
     </html>
+  settings:
+    podSecurityContext: *podUid101
+    securityContext: *containerRestricted
 
 multidim:
   enabled: false
@@ -421,6 +456,17 @@ pgstacBootstrap:
     # upgrade, and Helm waits for it. Autovacuum already analyzes the tables
     # imports change; keep deploys from paying for all of them.
     analyze: "off"
+    # Every pgstac Job and CronJob, and the wait-for-pgstac-jobs init
+    # container of stac, raster and vector (alpine/kubectl, run as nobody).
+    podSecurityContext: *podUid1000
+    securityContext: *containerRestricted
+    initContainerSecurityContext:
+      runAsNonRoot: true
+      runAsUser: 65534
+      runAsGroup: 65534
+      allowPrivilegeEscalation: false
+      capabilities:
+        drop: [ALL]
     userConnectionLimit: 30
     extraUsers:
       - name: eoapi-ingest
