@@ -16,6 +16,12 @@ ingress:
     enabled: true
     secretName: "eoapi-dev-tls"
 
+# No API token in the app containers, none of which calls the Kubernetes API;
+# only stac/raster/vector's wait-for-pgstac-jobs init container gets one, for
+# its `kubectl get job`.
+serviceAccount:
+  automount: false
+
 apiServices:
   - stac
   - raster
