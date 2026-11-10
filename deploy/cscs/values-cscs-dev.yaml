@@ -436,9 +436,9 @@ postgrescluster:
           endpoint: rgw.cscs.ch
           # Ceph RGW ignores it, but pgBackRest requires one.
           region: us-east-1
-        schedules:
-          full: "0 1 * * 0"
-          differential: "0 1 * * 1-6"
+        # No schedules while the first block-incremental full is taken by hand
+        # and the old full expired; a daily differential comes back after.
+        # Removing them makes PGO delete the backup CronJobs.
     # An on-demand full, started by giving the PostgresCluster annotation
     # postgres-operator.crunchydata.com/pgbackrest-backup a new value. It does
     # not expire: run `pgbackrest expire` by hand afterwards, since a failed
