@@ -443,11 +443,15 @@ postgrescluster:
     # postgres-operator.crunchydata.com/pgbackrest-backup a new value. It does
     # not expire: run `pgbackrest expire` by hand afterwards, since a failed
     # expire inside the backup Job makes PGO re-run the whole backup.
+    # io-timeout 600, not the 3600 above: every attempt of the 2026-11-10 full
+    # with 3600 stalled ~25 min in, when one request outlived TCP's own ~15 min
+    # give-up and its retries never recovered while the workers timed out.
     manual:
       repoName: repo1
       options:
         - --type=full
         - --no-expire-auto
+        - --io-timeout=600
   patroni:
     dynamicConfiguration:
       postgresql:
