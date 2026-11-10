@@ -178,7 +178,7 @@ narthex-backend:
   # Same narthex release as narthex-frontend. Always rather than IfNotPresent:
   # narthex's pre-release tags were re-pushed in place.
   image:
-    tag: "v1.2.1-beta.1"
+    tag: "v1.2.2-beta.1"
     pullPolicy: Always
   ingress:
     enabled: false
@@ -197,7 +197,7 @@ narthex-backend:
 narthex-frontend:
   enabled: true
   image:
-    tag: "v1.2.1-beta.1"
+    tag: "v1.2.2-beta.1"
     pullPolicy: Always
   ingress:
     enabled: false

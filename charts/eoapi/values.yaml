@@ -857,8 +857,9 @@ narthex-backend:
   image:
     name: ghcr.io/c2sm/narthex-backend
     # From v1.2.1-beta.1 both narthex images run as non-root (backend uid
-    # 1000, frontend uid 101), and the frontend listens on 8080.
-    tag: "v1.2.1-beta.1"
+    # 1000, frontend uid 101), and the frontend listens on 8080. From
+    # v1.2.2-beta.1 successful probe requests stay out of the access logs.
+    tag: "v1.2.2-beta.1"
     pullPolicy: IfNotPresent
   service:
     port: 8000
@@ -897,7 +898,7 @@ narthex-frontend:
   image:
     name: ghcr.io/c2sm/narthex-frontend
     # Must listen on 8080 (v1.2.1-beta.1 or later); the Service targets it.
-    tag: "v1.2.1-beta.1"
+    tag: "v1.2.2-beta.1"
     pullPolicy: IfNotPresent
   service:
     port: 80

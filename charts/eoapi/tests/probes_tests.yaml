@@ -1,11 +1,15 @@
-suite: probes for browser and doc-server
+suite: probes for browser, doc-server and narthex
 templates:
   - templates/_helpers/core.tpl
+  - templates/_helpers/database.tpl
   - templates/_helpers/networking.tpl
   - templates/_helpers/services.tpl
   - templates/services/browser/deployment.yaml
   - templates/services/browser/configmap.yaml
   - templates/services/doc-server.yaml
+  - templates/services/narthex-backend/deployment.yaml
+  - templates/services/narthex-frontend/configmap.yaml
+  - templates/services/narthex-frontend/deployment.yaml
 tests:
   - it: browser readiness fetches the index under the default path prefix
     template: templates/services/browser/deployment.yaml
@@ -58,3 +62,45 @@ tests:
       - equal:
           path: spec.template.spec.containers[0].livenessProbe.tcpSocket.port
           value: 8080
+
+  - it: narthex backend probes /health and allows 150s for migrations
+    template: templates/services/narthex-backend/deployment.yaml
+    set:
+      narthex-backend.enabled: true
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].startupProbe
+          value:
+            httpGet:
+              path: /health
+              port: 8000
+            periodSeconds: 5
+            failureThreshold: 30
+      - equal:
+          path: spec.template.spec.containers[0].readinessProbe.httpGet
+          value:
+            path: /health
+            port: 8000
+      - equal:
+          path: spec.template.spec.containers[0].livenessProbe.httpGet
+          value:
+            path: /health
+            port: 8000
+
+  - it: narthex frontend probes /healthz on 8080
+    template: templates/services/narthex-frontend/deployment.yaml
+    set:
+      narthex-frontend.enabled: true
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].readinessProbe.httpGet
+          value:
+            path: /healthz
+            port: 8080
+      - equal:
+          path: spec.template.spec.containers[0].livenessProbe.httpGet
+          value:
+            path: /healthz
+            port: 8080
+      - notExists:
+          path: spec.template.spec.containers[0].startupProbe

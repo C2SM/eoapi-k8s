@@ -52,6 +52,30 @@ spec:
               exec uvicorn narthex.main:app --host 0.0.0.0 --port 8000
           ports:
             - containerPort: 8000
+          # /health needs no auth and touches neither the database nor the OIDC
+          # issuer, so a database outage cannot put the pod in a restart loop.
+          # The port opens only after `alembic upgrade head`, which runs all
+          # pending migrations in one transaction. A migration that may outlast
+          # the startup budget (30 x 5s) belongs in a Job: killed by the probe,
+          # it rolls back and starts over on every restart.
+          startupProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            periodSeconds: 5
+            failureThreshold: 30
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            periodSeconds: 10
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            periodSeconds: 15
+            failureThreshold: 3
           env:
             - name: PGUSER
               valueFrom:

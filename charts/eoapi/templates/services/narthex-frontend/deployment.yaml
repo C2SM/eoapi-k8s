@@ -48,6 +48,22 @@ spec:
           {{- end }}
           ports:
             - containerPort: 8080
+          # nginx starts only after the entrypoint has written config.js, so any
+          # 200 means the app is configured. From v1.2.2-beta.1 nginx answers
+          # /healthz itself and keeps it out of the access log; older images
+          # serve the SPA there, which also returns 200.
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: 8080
+            periodSeconds: 10
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8080
+            periodSeconds: 15
+            failureThreshold: 3
           env:
             - name: NARTHEX_API_URL
               value: {{ $nf.apiUrl | quote }}
