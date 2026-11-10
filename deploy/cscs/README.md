@@ -15,6 +15,7 @@ Install or upgrade the release (a first install follows the order in
 helm upgrade --install eoapi ./charts/eoapi \
   -n eoapi-dev \
   --create-namespace \
+  -f charts/eoapi/profiles/development.yaml \
   -f deploy/cscs/values-cscs-dev.yaml \
   -f deploy/cscs/values-cscs-dev-stac-auth-proxy.yaml \
   -f deploy/cscs/values-cscs-dev-auth-keycloak.yaml \
@@ -26,6 +27,7 @@ Render locally before applying:
 ```bash
 helm template eoapi ./charts/eoapi \
   -n eoapi-dev \
+  -f charts/eoapi/profiles/development.yaml \
   -f deploy/cscs/values-cscs-dev.yaml \
   -f deploy/cscs/values-cscs-dev-stac-auth-proxy.yaml \
   -f deploy/cscs/values-cscs-dev-auth-keycloak.yaml \
@@ -57,6 +59,8 @@ and client ID in its `keycloak:` section; the gate's client secret is the
 registered redirect URIs, the network precondition, the deploy order, the logs
 to watch and the rollback.
 
-All three values files, every time: omitting the Keycloak one fails the render,
+All four files, every time: omitting the Keycloak one fails the render,
 omitting the stac-auth-proxy one silently disables group filtering and the
-browser login button.
+browser login button, and omitting the development profile silently drops
+every app pod's resource requests and limits. The profile comes first so the
+CSCS values can override it.

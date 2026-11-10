@@ -1,0 +1,97 @@
+# eoAPI Development Profile
+# Resource requests and limits for a small, lightly used deployment: one
+# replica per service and development traffic. It sets nothing but
+# `resources`, so it layers under a deployment's own values.
+#
+# Usage:
+#   helm upgrade --install eoapi ./charts/eoapi \
+#     -f profiles/development.yaml -f <your values>.yaml
+#
+# Sized from eoapi-dev (CSCS) over the 7 days to 2026-11-10: requests at about
+# the measured peak memory and above typical CPU, memory limits at roughly
+# 1.5-2x that peak, and no CPU limits, which throttle a pod even on an idle
+# node. Memory follows the number of workers (WEB_CONCURRENCY) more than the
+# traffic, so raise it with them.
+#
+# Postgres and pgBouncer are not here. Their settings sit in the
+# postgrescluster `instances` list and in the pgBackRestConfig / pgBouncerConfig
+# blocks the subchart passes through whole; a profile cannot merge into a list,
+# and setting either block here would replace a deployment's own.
+
+stac:
+  settings:
+    resources:
+      # Peak 1.25 GiB with 10 workers.
+      requests:
+        cpu: "100m"
+        memory: "1Gi"
+      limits:
+        memory: "2Gi"
+
+raster:
+  settings:
+    resources:
+      # Peak 583 MiB with 4 workers; each may also hold up to GDAL_CACHEMAX
+      # (200 MB) of raster cache under load.
+      requests:
+        cpu: "50m"
+        memory: "640Mi"
+      limits:
+        memory: "1536Mi"
+
+vector:
+  settings:
+    resources:
+      # Peak 538 MiB with 8 workers.
+      requests:
+        cpu: "50m"
+        memory: "640Mi"
+      limits:
+        memory: "1Gi"
+
+stac-auth-proxy:
+  # Peak 189 MiB, CPU p99 3m. Replaces the subchart's 500m request and drops
+  # its 2-CPU limit.
+  resources:
+    requests:
+      cpu: "50m"
+      memory: "256Mi"
+    limits:
+      cpu: null
+      memory: "512Mi"
+
+browser:
+  settings:
+    resources:
+      requests:
+        cpu: "5m"
+        memory: "32Mi"
+      limits:
+        memory: "64Mi"
+
+docServer:
+  settings:
+    resources:
+      requests:
+        cpu: "5m"
+        memory: "32Mi"
+      limits:
+        memory: "64Mi"
+
+narthex-backend:
+  settings:
+    resources:
+      requests:
+        cpu: "10m"
+        memory: "128Mi"
+      limits:
+        memory: "256Mi"
+
+narthex-frontend:
+  settings:
+    resources:
+      requests:
+        cpu: "5m"
+        memory: "32Mi"
+      limits:
+        memory: "64Mi"

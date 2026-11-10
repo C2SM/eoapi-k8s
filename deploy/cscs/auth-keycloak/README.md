@@ -205,6 +205,7 @@ kubectl -n eoapi-dev rollout status deploy/eoapi-dev-oauth2-proxy --timeout=120s
 
 # 4. Switch the release over.
 helm upgrade --install eoapi ./charts/eoapi -n eoapi-dev \
+  -f charts/eoapi/profiles/development.yaml \
   -f deploy/cscs/values-cscs-dev.yaml \
   -f deploy/cscs/values-cscs-dev-stac-auth-proxy.yaml \
   -f deploy/cscs/values-cscs-dev-auth-keycloak.yaml \
