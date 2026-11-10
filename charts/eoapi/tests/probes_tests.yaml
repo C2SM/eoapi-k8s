@@ -1,0 +1,60 @@
+suite: probes for browser and doc-server
+templates:
+  - templates/_helpers/core.tpl
+  - templates/_helpers/networking.tpl
+  - templates/_helpers/services.tpl
+  - templates/services/browser/deployment.yaml
+  - templates/services/browser/configmap.yaml
+  - templates/services/doc-server.yaml
+tests:
+  - it: browser readiness fetches the index under the default path prefix
+    template: templates/services/browser/deployment.yaml
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].readinessProbe.httpGet
+          value:
+            path: /browser/
+            port: 8080
+      - equal:
+          path: spec.template.spec.containers[0].livenessProbe.tcpSocket.port
+          value: 8080
+
+  - it: browser readiness follows a custom path
+    template: templates/services/browser/deployment.yaml
+    set:
+      browser.ingress.path: /catalog
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].readinessProbe.httpGet.path
+          value: /catalog/
+
+  - it: browser readiness at a trailing-slash custom path is not doubled
+    template: templates/services/browser/deployment.yaml
+    set:
+      browser.ingress.path: /catalog/
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].readinessProbe.httpGet.path
+          value: /catalog/
+
+  - it: browser served at the root is probed at /
+    template: templates/services/browser/deployment.yaml
+    set:
+      browser.ingress.path: /
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].readinessProbe.httpGet.path
+          value: /
+
+  - it: doc-server is probed on 8080
+    template: templates/services/doc-server.yaml
+    documentIndex: 1
+    asserts:
+      - equal:
+          path: spec.template.spec.containers[0].readinessProbe.httpGet
+          value:
+            path: /
+            port: 8080
+      - equal:
+          path: spec.template.spec.containers[0].livenessProbe.tcpSocket.port
+          value: 8080

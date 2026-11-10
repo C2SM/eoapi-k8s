@@ -42,6 +42,20 @@ spec:
           {{- end }}
           ports:
           - containerPort: 8080
+          # nginx serves the app only under the path prefix, so / is a 404.
+          # Readiness fetches the index there, which also fails when the image
+          # serves a different prefix; liveness only needs nginx to answer.
+          readinessProbe:
+            httpGet:
+              path: {{ include "eoapi.browserPathPrefix" . }}
+              port: 8080
+            periodSeconds: 15
+            failureThreshold: 3
+          livenessProbe:
+            tcpSocket:
+              port: 8080
+            periodSeconds: 15
+            failureThreshold: 3
           env:
             - name: SB_pathPrefix
               value: {{ include "eoapi.browserPathPrefix" . | quote }}
