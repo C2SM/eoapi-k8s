@@ -413,11 +413,12 @@ postgrescluster:
       archive-async: "y"
       archive-push-queue-max: 64GiB
       # Expiring a backup set deletes its files 1000 per S3 request, and RGW
-      # takes minutes per request on files that large; the HTTP proxy in front
-      # of it closes any request at 300s, after which pgBackRest resends it
-      # until io-timeout runs out. At 60s every expire after a full failed, at
-      # 600s (one resend) the 2026-11-08 one still did, and each failure
-      # re-ran the backup Job. 3600s allows up to 12 attempts per request.
+      # has taken up to 31 min to answer one. The proxy in front of RGW drops a
+      # connection that stays silent for 300s, and pgBackRest resends until
+      # io-timeout runs out: at 600s the 2026-11-08 full's expire still failed,
+      # and each failure re-ran the backup Job. No timeout helps once a request
+      # is resent more than 15 min after it was signed: RGW rejects it with
+      # 403 RequestTimeTooSkewed, and pgBackRest does not retry a 403.
       io-timeout: "3600"
       # The backup Job's log, otherwise warnings only, then shows each step.
       log-level-console: info
