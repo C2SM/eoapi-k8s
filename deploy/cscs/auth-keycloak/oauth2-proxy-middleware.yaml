@@ -6,11 +6,12 @@
 # oauth2-proxy-configmap.yaml for why.
 #
 # `allowed_groups` on the address is the gate: a signed-in user holding none
-# of them gets a 403. The names are those custom_filters.py maps, dyamond in
-# all three spellings, each in every form oauth2-proxy's keycloak-oidc provider
-# can hand it over in - a `groups` claim value, `role:<realm role>`,
-# `role:<client>:<client role>`. Real tokens carry them in `groups` (CSCS: the
-# realm has no prometheus_* roles); the login log line shows the actual form.
+# of them gets a 403. The names are those cscs_custom_filters.py maps,
+# dyamond in all three spellings, each in every form oauth2-proxy's
+# keycloak-oidc provider can hand it over in - a `groups` claim value,
+# `role:<realm role>`, `role:<client>:<client role>`. Real tokens carry them in
+# `groups` (CSCS: the realm has no prometheus_* roles); the login log line
+# shows the actual form.
 #
 # trustForwardHeader is deliberately false. oauth2-proxy matches its
 # skip_auth_routes against X-Forwarded-Uri, so a client-supplied

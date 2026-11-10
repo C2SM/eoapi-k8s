@@ -30,7 +30,7 @@ of them made `/browser` answer `400 Request Header Or Cookie Too Large`.
 | Notebook client (`stacOidcClientId`) | each `narthex-launch` entry of `narthex-frontend.launchConfigs` in `../values-cscs-dev.yaml` - the one value outside the overlay, see [Notebook clients](#notebook-clients) |
 | Gate client, cookie | `oauth2-proxy-configmap.yaml` |
 | Gate roles (`allowed_groups`) | `oauth2-proxy-middleware.yaml` |
-| Role → collections | `charts/eoapi/data/stac-auth-proxy/custom_filters.py` |
+| Role → collections | `charts/eoapi/data/stac-auth-proxy/cscs_custom_filters.py` |
 | Gate client secret, cookie secret | Secret `oauth2-proxy-keycloak-secret` (below) |
 
 The `keycloak:` section is not read by the chart: it holds YAML anchors, so

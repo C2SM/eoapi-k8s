@@ -30,7 +30,10 @@ stac-auth-proxy:
     securityContext:
         seccompProfile:
             type: RuntimeDefault
-    customFiltersFile: "data/stac-auth-proxy/custom_filters.py"
+    # The CSCS role -> auth:groups policy. The chart's default file stays
+    # upstream's allow-all sample, which CI's integration tests rely on. It is
+    # still mounted as custom_filters.py, the module the *_FILTER_CLS name.
+    customFiltersFile: "data/stac-auth-proxy/cscs_custom_filters.py"
     extraVolumes:
         - name: filters
           configMap:
