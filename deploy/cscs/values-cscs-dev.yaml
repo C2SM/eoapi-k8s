@@ -412,6 +412,13 @@ postgrescluster:
       process-max: "4"
       archive-async: "y"
       archive-push-queue-max: 64GiB
+      # Bundling packs the many small relation files into larger objects, so a
+      # backup set has far fewer S3 objects to write and later to delete.
+      # Block incremental lets a diff store only the changed blocks of a file
+      # instead of the whole 1 GB segment. A diff can do that only against a
+      # full taken with it on, because it reuses that full's block maps.
+      repo1-bundle: "y"
+      repo1-block: "y"
       # Expiring a backup set deletes its files 1000 per S3 request, and RGW
       # has taken up to 31 min to answer one. The proxy in front of RGW drops a
       # connection that stays silent for 300s, and pgBackRest resends until
@@ -432,6 +439,15 @@ postgrescluster:
         schedules:
           full: "0 1 * * 0"
           differential: "0 1 * * 1-6"
+    # An on-demand full, started by giving the PostgresCluster annotation
+    # postgres-operator.crunchydata.com/pgbackrest-backup a new value. It does
+    # not expire: run `pgbackrest expire` by hand afterwards, since a failed
+    # expire inside the backup Job makes PGO re-run the whole backup.
+    manual:
+      repoName: repo1
+      options:
+        - --type=full
+        - --no-expire-auto
   patroni:
     dynamicConfiguration:
       postgresql:
