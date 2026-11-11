@@ -386,7 +386,19 @@ postgrescluster:
           # this. Needs the operator's AutoGrowVolumes feature gate.
           limits:
             storage: "20Ti"
-      resources: {}
+      # Memory request = limit. Inside its own limit the kernel reclaims
+      # Postgres's page cache rather than letting it fill the node, and a pod
+      # whose usage stays within its request is evicted last. Without
+      # requests it was BestEffort: on 2026-11-10 the kubelet hard-evicted it
+      # three times during a full backup and an ingest, each time at ~12 GiB
+      # of mostly active page cache (RSS 0.1-1.5 GiB), each a crash recovery.
+      # No CPU limit, which would throttle it on an idle node.
+      resources:
+        requests:
+          cpu: "1"
+          memory: "8Gi"
+        limits:
+          memory: "8Gi"
   # pgBackRest to CSCS object storage (tenant c2sm, user prometheus-db-backup).
   # The keys live only in the eoapi-pgbackrest-s3 Secret (an s3.conf with
   # repo1-s3-key / repo1-s3-key-secret), created by hand, never in values.
