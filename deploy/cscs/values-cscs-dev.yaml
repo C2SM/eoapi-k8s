@@ -403,9 +403,9 @@ postgrescluster:
   # The keys live only in the eoapi-pgbackrest-s3 Secret (an s3.conf with
   # repo1-s3-key / repo1-s3-key-secret), created by hand, never in values.
   # A volume repo with no schedule or retention once filled up with archived
-  # WAL and then filled pgdata; here scheduled fulls let retention expire old
-  # WAL, and archive-push-queue-max drops WAL (breaking PITR until the next
-  # full) instead of filling pgdata when S3 is unreachable.
+  # WAL and then filled pgdata; here each daily differential's expire drops the
+  # WAL from before it, and archive-push-queue-max drops WAL (breaking PITR
+  # until the next backup) instead of filling pgdata when S3 is unreachable.
   backupsEnabled: true
   pgBackRestConfig:
     configuration:
@@ -431,14 +431,18 @@ postgrescluster:
       # full taken with it on, because it reuses that full's block maps.
       repo1-bundle: "y"
       repo1-block: "y"
-      # Expiring a backup set deletes its files 1000 per S3 request, and RGW
-      # has taken up to 31 min to answer one. The proxy in front of RGW drops a
-      # connection that stays silent for 300s, and pgBackRest resends until
-      # io-timeout runs out: at 600s the 2026-11-08 full's expire still failed,
-      # and each failure re-ran the backup Job. No timeout helps once a request
-      # is resent more than 15 min after it was signed: RGW rejects it with
-      # 403 RequestTimeTooSkewed, and pgBackRest does not retry a 403.
-      io-timeout: "3600"
+      # Not more than 600: with 3600 every attempt of the 2026-11-10 full
+      # stalled ~25 min in, when one S3 request outlived TCP's own ~15 min
+      # give-up and its retries ran on until the workers timed out; the
+      # 2026-11-11 full ran clean with 600.
+      # Expiring a full needs more. It deletes the files 1000 per S3 request,
+      # RGW has taken up to 31 min to answer one, and the proxy in front of RGW
+      # drops a connection silent for 300s; at 600 the 2026-11-08 full's expire
+      # failed and re-ran the backup Job. So a full is expired by hand with
+      # `pgbackrest expire --io-timeout=3600`, rerun on 403
+      # RequestTimeTooSkewed (RGW's answer to a request resent more than 15
+      # min after it was signed, which pgBackRest does not retry).
+      io-timeout: "600"
       # The backup Job's log, otherwise warnings only, then shows each step.
       log-level-console: info
     repos:
@@ -448,22 +452,21 @@ postgrescluster:
           endpoint: rgw.cscs.ch
           # Ceph RGW ignores it, but pgBackRest requires one.
           region: us-east-1
-        # No schedules while the first block-incremental full is taken by hand
-        # and the old full expired; a daily differential comes back after.
-        # Removing them makes PGO delete the backup CronJobs.
+        # A daily differential and no scheduled full. A diff's own expire then
+        # drops only WAL, whose deletes take seconds; diffs are kept until
+        # their full goes.
+        schedules:
+          differential: "0 1 * * *"
     # An on-demand full, started by giving the PostgresCluster annotation
     # postgres-operator.crunchydata.com/pgbackrest-backup a new value. It does
-    # not expire: run `pgbackrest expire` by hand afterwards, since a failed
-    # expire inside the backup Job makes PGO re-run the whole backup.
-    # io-timeout 600, not the 3600 above: every attempt of the 2026-11-10 full
-    # with 3600 stalled ~25 min in, when one request outlived TCP's own ~15 min
-    # give-up and its retries never recovered while the workers timed out.
+    # not expire: expire the old full by hand (see io-timeout above) before
+    # the next diff runs, since that diff's expire would otherwise delete it
+    # and fail, and a failed expire makes PGO re-run the whole backup Job.
     manual:
       repoName: repo1
       options:
         - --type=full
         - --no-expire-auto
-        - --io-timeout=600
   patroni:
     dynamicConfiguration:
       postgresql:
