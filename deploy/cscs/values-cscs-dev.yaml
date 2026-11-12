@@ -504,7 +504,7 @@ postgrescluster:
         resources: *pgSidecarTiny
     # The backup Jobs, manual and scheduled: peak 152 MiB, up to 1 CPU on the
     # manual full. Generous, as a Job killed for memory re-runs its backup.
-    jobs:
+    jobs: &pgBackupJobs
       resources:
         requests:
           cpu: "100m"
@@ -588,3 +588,44 @@ postgrescluster-narthex:
       sidecars:
         replicaCertCopy:
           resources: *pgSidecarTiny
+  # Same bucket and keys as the eoapi cluster, under its own path. The
+  # database is ~30 MB, so a nightly full is cheap and each one restores on
+  # its own; seven are kept, with the WAL between them, for a week of PITR.
+  # It runs after the eoapi differential (01:00).
+  backupsEnabled: true
+  pgBackRestConfig:
+    configuration:
+      - secret:
+          name: eoapi-pgbackrest-s3
+    global:
+      repo1-path: /pgbackrest/eoapi-dev/narthex/repo1
+      repo1-s3-uri-style: path
+      repo1-retention-full: "7"
+      repo1-retention-full-type: count
+      repo1-bundle: "y"
+      compress-type: zst
+      # archive_timeout is 60s, and while S3 is unreachable every unarchived
+      # 16 MB segment stays in pg_wal, on the 20Gi data volume. Past this
+      # pgBackRest drops WAL (breaking PITR until the next full) instead.
+      archive-push-queue-max: 4GiB
+      io-timeout: "600"
+      log-level-console: info
+    repos:
+      - name: repo1
+        s3:
+          bucket: eoapi-dev-pgbackrest
+          endpoint: rgw.cscs.ch
+          region: us-east-1
+        schedules:
+          full: "30 2 * * *"
+    sidecars:
+      pgbackrest:
+        resources:
+          requests:
+            cpu: "10m"
+            memory: "64Mi"
+          limits:
+            memory: "256Mi"
+      pgbackrestConfig:
+        resources: *pgSidecarTiny
+    jobs: *pgBackupJobs
