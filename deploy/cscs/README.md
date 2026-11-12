@@ -40,6 +40,42 @@ The ingress middleware annotation uses Traefik's Kubernetes CRD reference form:
 eoapi-dev-eoapi-dev-ipallowlist@kubernetescrd
 ```
 
+## Namespace security
+
+Two things outside the chart, applied with kubectl.
+
+**Pod Security `restricted`**, enforced since 2026-11-12. The namespace
+refuses any new pod that may run as root, can escalate privileges, keeps Linux
+capabilities or has no seccomp profile. `warn` makes kubectl and helm print the
+violation, and `audit` logs it. Every pod of the chart, of PGO and of phegos
+complies, the chart's through the security contexts in `values-cscs-dev.yaml`.
+A refused pod never starts: a Deployment keeps its old pods, a Helm hook Job
+makes `helm upgrade` wait until it times out, and ad-hoc `kubectl run` or
+`kubectl debug` pods need a security context too. Running pods are never
+affected.
+
+```bash
+kubectl label --overwrite ns eoapi-dev \
+  pod-security.kubernetes.io/enforce=restricted \
+  pod-security.kubernetes.io/warn=restricted \
+  pod-security.kubernetes.io/audit=restricted
+
+# Before changing the level: lists the running pods it would refuse.
+kubectl label --dry-run=server --overwrite ns eoapi-dev \
+  pod-security.kubernetes.io/enforce=restricted
+
+# Undo.
+kubectl label ns eoapi-dev pod-security.kubernetes.io/enforce- \
+  pod-security.kubernetes.io/warn- pod-security.kubernetes.io/audit-
+```
+
+There is deliberately no Namespace manifest for this: `kubectl delete -f` on
+one would delete the namespace.
+
+**NetworkPolicies** for the two Postgres clusters, in `network-policies.yaml`;
+its header lists who may connect. A new database client needs a line there, or
+its connections time out.
+
 ## CSCS Keycloak Auth
 
 `deploy/cscs/auth-keycloak/` is the auth path, live since 2026-10-30
