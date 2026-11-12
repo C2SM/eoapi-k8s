@@ -6,8 +6,9 @@
 #    narthex primary, and the Service balanced across both.
 #  - externalTrafficPolicy Local keeps the client address, so pg_stat_activity
 #    shows which santis node a connection comes from.
-#  - pg_hba allows md5 from anywhere, so the source range is the only network
-#    restriction. Imports connect as eoapi-ingest (capped) with sslmode=require.
+#  - pg_hba allows md5 from anywhere, so the source range and the
+#    eoapi-postgres NetworkPolicy are the only network restrictions. Imports
+#    connect as eoapi-ingest (capped) with sslmode=require.
 apiVersion: v1
 kind: Service
 metadata:
@@ -24,9 +25,15 @@ spec:
   selector:
     postgres-operator.crunchydata.com/cluster: eoapi
     postgres-operator.crunchydata.com/role: master
+  # Keep these in step with the eoapi-postgres NetworkPolicy
+  # (network-policies.yaml), which admits the same sources.
   loadBalancerSourceRanges:
     # santis HSN: login nodes reach the cluster from 172.28.x.x.
     - 172.28.0.0/16
+    # IAC fog.ethz.ch and co2.ethz.ch. As of 2026-11-12 the CSCS firewall
+    # drops them before the cluster (Cilium never counted a source-range drop).
+    - 129.132.165.67/32
+    - 129.132.165.78/32
   ports:
     - name: postgres
       port: 5432

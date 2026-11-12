@@ -1,0 +1,107 @@
+# Who may connect to the two Postgres clusters. Without these, any pod in the
+# whole cluster could reach them, and pg_hba accepts password logins from any
+# address. Cilium enforces them. Applied by hand, like postgres-direct.yaml:
+#   kubectl -n eoapi-dev apply -f deploy/cscs/network-policies.yaml
+#
+#  - Only connections into the Postgres instance pods are restricted; every
+#    other pod is unaffected.
+#  - A new database client (a Job, a service) needs a line here, or its
+#    connections time out.
+#  - Each cluster's own pods (pgBouncer, the backup Jobs on pgBackRest's 8432,
+#    and replicas once there are any, on 5432 and Patroni's 8008) match by
+#    the operator's cluster label.
+#  - Cilium always lets the node itself in (the kubelet's probes on 8008), and
+#    kubectl exec and port-forward enter the pod directly, so neither is
+#    affected.
+#  - Rollback: kubectl -n eoapi-dev delete -f deploy/cscs/network-policies.yaml
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: eoapi-postgres
+  namespace: eoapi-dev
+  labels:
+    app.kubernetes.io/part-of: eoapi-dev
+spec:
+  podSelector:
+    matchLabels:
+      postgres-operator.crunchydata.com/cluster: eoapi
+      postgres-operator.crunchydata.com/data: postgres
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              postgres-operator.crunchydata.com/cluster: eoapi
+      ports:
+        - {port: 5432, protocol: TCP}
+        - {port: 8008, protocol: TCP}
+        - {port: 8432, protocol: TCP}
+    - from:
+        # The APIs, and the chart's pgstac Jobs.
+        - podSelector:
+            matchExpressions:
+              - key: app
+                operator: In
+                values:
+                  - eoapi-stac
+                  - eoapi-raster
+                  - eoapi-vector
+                  - eoapi-pgstac-migrate
+                  - eoapi-pgstac-superuser-init-db
+                  - eoapi-pgstac-load-samples
+        # phegos, its own Helm release: the API, the hourly embed CronJob and
+        # the schema Job.
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/instance: phegos
+            matchExpressions:
+              - key: app.kubernetes.io/component
+                operator: In
+                values: [phegos, embed, db-init]
+        # Bulk imports (nasa_import, sim_import) through pgstac-postgres-direct,
+        # which keeps the client's own address. Keep these in step with its
+        # loadBalancerSourceRanges.
+        # santis login nodes.
+        - ipBlock:
+            cidr: 172.28.0.0/16
+        # IAC fog.ethz.ch and co2.ethz.ch. As of 2026-11-12 the CSCS firewall
+        # still drops them before the cluster; they work once it lets them in.
+        - ipBlock:
+            cidr: 129.132.165.67/32
+        - ipBlock:
+            cidr: 129.132.165.78/32
+      ports:
+        - {port: 5432, protocol: TCP}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: narthex-postgres
+  namespace: eoapi-dev
+  labels:
+    app.kubernetes.io/part-of: eoapi-dev
+spec:
+  podSelector:
+    matchLabels:
+      postgres-operator.crunchydata.com/cluster: narthex
+      postgres-operator.crunchydata.com/data: postgres
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              postgres-operator.crunchydata.com/cluster: narthex
+      ports:
+        - {port: 5432, protocol: TCP}
+        - {port: 8008, protocol: TCP}
+        - {port: 8432, protocol: TCP}
+    - from:
+        - podSelector:
+            matchExpressions:
+              - key: app
+                operator: In
+                values:
+                  - eoapi-narthex-backend
+                  - eoapi-narthex-superuser-init-db
+      ports:
+        - {port: 5432, protocol: TCP}
