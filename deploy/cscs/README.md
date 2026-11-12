@@ -76,6 +76,36 @@ one would delete the namespace.
 its header lists who may connect. A new database client needs a line there, or
 its connections time out.
 
+## Hardening decisions
+
+**Read-only root filesystems: not pursued.** The Postgres operator's
+containers already have one. For the other twelve (the nginx front ends, the
+Python APIs, stac-auth-proxy, oauth2-proxy and phegos), every path an image
+writes to would first have to be found and given an `emptyDir`. A missed path
+only shows up as a failure at runtime, so each service would need its own round
+of testing, and another after every image upgrade. The gain is small: every
+container already runs as a non-root user with no capabilities and no privilege
+escalation, under Pod Security `restricted`, and a restart discards whatever
+was written. The squeeze isn't worth the juice. Worth revisiting if a service
+starts running untrusted code or handling uploads.
+
+**PodDisruptionBudgets: for production, together with replicas.** With one
+replica per service a budget can only block node drains (kured reboots a node
+on weekdays and forces it after 10 minutes), so there are none. When a
+production deployment runs two or more replicas of a service:
+
+- Give each scaled-out service a PodDisruptionBudget with `maxUnavailable: 1`,
+  so a drain evicts one pod at a time. The chart has no template for it yet:
+  either add one (an upstream PR candidate) or keep a manifest next to the
+  deployment's values.
+- Spread the replicas over nodes with the service's `settings.affinity` (a
+  preferred pod anti-affinity on its `app` label), so one node going down does
+  not take them all.
+- Postgres needs nothing extra: PGO creates its own budgets, `minAvailable: 1`,
+  as soon as `instances[].replicas` or `pgBouncerConfig.replicas` is above one.
+- `profiles/production.yaml` already runs stac, raster and vector with at
+  least two replicas (`minReplicas: 2`) and the browser with two.
+
 ## CSCS Keycloak Auth
 
 `deploy/cscs/auth-keycloak/` is the auth path, live since 2026-10-30
