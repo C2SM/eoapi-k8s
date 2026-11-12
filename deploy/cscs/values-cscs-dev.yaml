@@ -370,7 +370,24 @@ postgrescluster:
   enabled: true
   postgresVersion: 16
   postGISVersion: "3.4"
-  pgBouncerReplicas: 1
+  # Takes the place of pgBouncerReplicas: the subchart passes this block
+  # through whole, so it repeats the replica count. Peak 9 MiB.
+  pgBouncerConfig: &pgBouncerConfig
+    replicas: 1
+    resources:
+      requests:
+        cpu: "10m"
+        memory: "32Mi"
+      limits:
+        memory: "64Mi"
+    sidecars:
+      pgbouncerConfig:
+        resources: &pgSidecarTiny
+          requests:
+            cpu: "5m"
+            memory: "16Mi"
+          limits:
+            memory: "32Mi"
   monitoring: false
   instances:
     - name: "eoapi"
@@ -399,6 +416,9 @@ postgrescluster:
           memory: "8Gi"
         limits:
           memory: "8Gi"
+      sidecars:
+        replicaCertCopy:
+          resources: *pgSidecarTiny
   # pgBackRest to CSCS object storage (tenant c2sm, user prometheus-db-backup).
   # The keys live only in the eoapi-pgbackrest-s3 Secret (an s3.conf with
   # repo1-s3-key / repo1-s3-key-secret), created by hand, never in values.
@@ -467,6 +487,30 @@ postgrescluster:
       options:
         - --type=full
         - --no-expire-auto
+    sidecars:
+      # Serves the backup's file reads and compresses them (~2 CPUs at
+      # process-max 4), and pushes WAL. Its own memory peaked at 77 MiB, but
+      # the files a backup reads sat in its page cache, up to 3.4 GiB of it
+      # counted as in use, on top of the database's 8Gi request. The limit
+      # makes the kernel drop that cache instead; a backup reads each file once.
+      pgbackrest:
+        resources:
+          requests:
+            cpu: "250m"
+            memory: "256Mi"
+          limits:
+            memory: "1Gi"
+      pgbackrestConfig:
+        resources: *pgSidecarTiny
+    # The backup Jobs, manual and scheduled: peak 152 MiB, up to 1 CPU on the
+    # manual full. Generous, as a Job killed for memory re-runs its backup.
+    jobs:
+      resources:
+        requests:
+          cpu: "100m"
+          memory: "256Mi"
+        limits:
+          memory: "512Mi"
   patroni:
     dynamicConfiguration:
       postgresql:
@@ -522,6 +566,7 @@ pgstacBootstrap:
 
 postgrescluster-narthex:
   enabled: true
+  pgBouncerConfig: *pgBouncerConfig
   instances:
     - name: "narthex"
       replicas: 1
@@ -532,3 +577,14 @@ postgrescluster-narthex:
         resources:
           requests:
             storage: "20Gi"
+      # Memory request = limit, as for the eoapi cluster. Peak 91 MiB, 9m
+      # CPU; the database is 30 MB, shared_buffers 128 MiB.
+      resources:
+        requests:
+          cpu: "25m"
+          memory: "512Mi"
+        limits:
+          memory: "512Mi"
+      sidecars:
+        replicaCertCopy:
+          resources: *pgSidecarTiny
