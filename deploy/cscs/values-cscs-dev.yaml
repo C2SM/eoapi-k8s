@@ -521,6 +521,13 @@ postgrescluster:
   patroni:
     dynamicConfiguration:
       postgresql:
+        # Replaces the chart's "host all all 0.0.0.0/0 md5": password logins
+        # over TLS only. Every client already uses TLS (libpq and asyncpg
+        # prefer it, the importers require it, pgBouncer verifies the server);
+        # this refuses one that does not. The narthex cluster has PGO's
+        # default, which is hostssl too. Applied on a reload.
+        pg_hba:
+          - "hostssl all all 0.0.0.0/0 md5"
         parameters:
           # 1GB forced a checkpoint every ~8s during bulk imports. Costs at
           # most 16GB of pg_wal while WAL archiving keeps up.
