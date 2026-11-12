@@ -423,8 +423,8 @@ postgrescluster:
   # The keys live only in the eoapi-pgbackrest-s3 Secret (an s3.conf with
   # repo1-s3-key / repo1-s3-key-secret), created by hand, never in values.
   # A volume repo with no schedule or retention once filled up with archived
-  # WAL and then filled pgdata; here each daily differential's expire drops the
-  # WAL from before it, and archive-push-queue-max drops WAL (breaking PITR
+  # WAL and then filled pgdata; here each backup's expire drops the WAL from
+  # before it, and archive-push-queue-max drops WAL (breaking PITR
   # until the next backup) instead of filling pgdata when S3 is unreachable.
   backupsEnabled: true
   pgBackRestConfig:
@@ -434,8 +434,14 @@ postgrescluster:
     global:
       repo1-path: /pgbackrest/eoapi-dev/eoapi/repo1
       repo1-s3-uri-style: path
-      repo1-retention-full: "1"
-      repo1-retention-full-type: count
+      # By age, so that deleting a full (~7400 objects, hours on RGW, see
+      # io-timeout) happens in a differential's expire, never in the weekly
+      # full's: a failed expire makes PGO re-run its backup Job, and a re-run
+      # differential is cheap, a re-run full is 3.6 TB. A full goes once a
+      # newer full is 8 days old, so the 8th or 9th diff after that newer
+      # full deletes it. Two fulls are kept, three for a day or two.
+      repo1-retention-full: "8"
+      repo1-retention-full-type: time
       # Imports write a lot of WAL: keep it only from the latest backup (full
       # or diff) on. Older backups stay restorable, but not to points between.
       repo1-retention-archive-type: diff
@@ -455,13 +461,14 @@ postgrescluster:
       # stalled ~25 min in, when one S3 request outlived TCP's own ~15 min
       # give-up and its retries ran on until the workers timed out; the
       # 2026-11-11 full ran clean with 600.
-      # Expiring a full needs more. It deletes the files 1000 per S3 request,
-      # RGW has taken up to 31 min to answer one, and the proxy in front of RGW
-      # drops a connection silent for 300s; at 600 the 2026-11-08 full's expire
-      # failed and re-ran the backup Job. So a full is expired by hand with
-      # `pgbackrest expire --io-timeout=3600`, rerun on 403
-      # RequestTimeTooSkewed (RGW's answer to a request resent more than 15
-      # min after it was signed, which pgBackRest does not retry).
+      # Expiring a full can still fail. It deletes the files 1000 per S3
+      # request, RGW has taken up to 31 min to answer one, and the proxy in
+      # front of RGW drops a connection silent for 300s; a request resent more
+      # than 15 min after it was signed gets 403 RequestTimeTooSkewed, which
+      # pgBackRest does not retry. Expire resumes where it stopped, so the
+      # differential Job's retries, or the next night's, finish it (see
+      # repo1-retention-full). By hand: `pgbackrest expire --io-timeout=3600`,
+      # rerun on 403.
       io-timeout: "600"
       # The backup Job's log, otherwise warnings only, then shows each step.
       log-level-console: info
@@ -472,16 +479,16 @@ postgrescluster:
           endpoint: rgw.cscs.ch
           # Ceph RGW ignores it, but pgBackRest requires one.
           region: us-east-1
-        # A daily differential and no scheduled full. A diff's own expire then
-        # drops only WAL, whose deletes take seconds; diffs are kept until
-        # their full goes.
+        # A full on Sundays and a differential on the other days, all at 01:00
+        # UTC. Block incremental keeps a diff to the changed blocks, but each
+        # one holds every change since its full. Diffs go with their full.
         schedules:
-          differential: "0 1 * * *"
+          full: "0 1 * * 0"
+          differential: "0 1 * * 1-6"
     # An on-demand full, started by giving the PostgresCluster annotation
-    # postgres-operator.crunchydata.com/pgbackrest-backup a new value. It does
-    # not expire: expire the old full by hand (see io-timeout above) before
-    # the next diff runs, since that diff's expire would otherwise delete it
-    # and fail, and a failed expire makes PGO re-run the whole backup Job.
+    # postgres-operator.crunchydata.com/pgbackrest-backup a new value. It skips
+    # its own expire, so a failure there can never re-run it; the scheduled
+    # Jobs' expires clean up after it.
     manual:
       repoName: repo1
       options:
